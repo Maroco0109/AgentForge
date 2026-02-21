@@ -1,7 +1,7 @@
 """Tests for Pydantic schemas."""
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 import pytest
 from pydantic import ValidationError
@@ -45,7 +45,7 @@ def test_conversation_create_with_user():
 def test_health_response():
     """Test HealthResponse schema."""
     resp = HealthResponse(
-        status="healthy", version="0.1.0", timestamp=datetime.utcnow()
+        status="healthy", version="0.1.0", timestamp=datetime.now(timezone.utc)
     )
     assert resp.status == "healthy"
 
