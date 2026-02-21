@@ -60,6 +60,7 @@ async def execute_pipeline(
         _pipeline_runs.popitem(last=False)
 
     _pipeline_runs[pipeline_id] = {
+        "user_id": str(current_user.id),
         "status": "running",
         "design_name": request.design.name,
         "started_at": started_at,
@@ -73,12 +74,12 @@ async def execute_pipeline(
         _pipeline_runs[pipeline_id]["status"] = result.status
         _pipeline_runs[pipeline_id]["result"] = result
     except Exception as e:
-        logger.error(f"Pipeline execution failed: {e}")
+        logger.error(f"Pipeline execution failed: {e}", exc_info=True)
         _pipeline_runs[pipeline_id]["status"] = "failed"
         result = PipelineResult(
             design_name=request.design.name,
             status="failed",
-            error=str(e),
+            error="Pipeline execution failed. Please try again.",
         )
         _pipeline_runs[pipeline_id]["result"] = result
 
@@ -91,15 +92,23 @@ async def execute_pipeline(
     )
 
 
+def _get_user_pipeline(pipeline_id: str, user_id: str) -> dict:
+    """Get a pipeline run owned by the given user, or raise 404/403."""
+    run = _pipeline_runs.get(pipeline_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Pipeline run not found")
+    if run.get("user_id") != user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    return run
+
+
 @router.get("/pipelines/{pipeline_id}/status", response_model=PipelineStatusResponse)
 async def get_pipeline_status(
     pipeline_id: str,
     current_user: User = Depends(get_current_user),
 ) -> PipelineStatusResponse:
     """Get the status of a pipeline execution."""
-    run = _pipeline_runs.get(pipeline_id)
-    if not run:
-        raise HTTPException(status_code=404, detail="Pipeline run not found")
+    run = _get_user_pipeline(pipeline_id, str(current_user.id))
 
     return PipelineStatusResponse(
         pipeline_id=pipeline_id,
@@ -116,9 +125,7 @@ async def get_pipeline_result(
     current_user: User = Depends(get_current_user),
 ) -> PipelineResult:
     """Get the result of a completed pipeline execution."""
-    run = _pipeline_runs.get(pipeline_id)
-    if not run:
-        raise HTTPException(status_code=404, detail="Pipeline run not found")
+    run = _get_user_pipeline(pipeline_id, str(current_user.id))
 
     result = run.get("result")
     if result is None:

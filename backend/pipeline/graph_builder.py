@@ -21,6 +21,8 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+MAX_AGENTS = 20
+
 # Role -> Node class mapping
 ROLE_NODE_MAP: dict[str, type] = {
     "collector": CollectorNode,
@@ -59,6 +61,8 @@ class PipelineGraphBuilder:
         agents = design.agents
         if not agents:
             raise ValueError("DesignProposal has no agents defined")
+        if len(agents) > MAX_AGENTS:
+            raise ValueError(f"Too many agents ({len(agents)}), maximum is {MAX_AGENTS}")
 
         graph = StateGraph(PipelineState)
         node_names: list[str] = []

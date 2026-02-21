@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 from abc import ABC, abstractmethod
@@ -104,7 +105,10 @@ class BaseAgentNode(ABC):
 
             except Exception as e:
                 logger.warning(f"Agent '{self.name}' attempt {attempt}/{MAX_RETRIES} failed: {e}")
-                if attempt == MAX_RETRIES:
+                if attempt < MAX_RETRIES:
+                    # Exponential backoff before retry
+                    await asyncio.sleep(2**attempt)
+                else:
                     duration = time.time() - start_time
                     result = AgentResult(
                         agent_name=self.name,
