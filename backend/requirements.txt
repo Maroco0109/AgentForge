@@ -16,3 +16,6 @@ python-multipart==0.0.9
 openai==1.58.0
 anthropic==0.40.0
 tiktoken==0.8.0
+langgraph>=0.4.5
+langchain-core>=0.2.27,<0.3
+typing-extensions>=4.12.0

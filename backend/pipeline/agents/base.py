@@ -1,0 +1,101 @@
+"""Base agent node for pipeline execution."""
+
+from __future__ import annotations
+
+import logging
+import time
+from abc import ABC, abstractmethod
+
+from backend.pipeline.llm_router import LLMResponse, LLMRouter, TaskComplexity, llm_router
+from backend.pipeline.result import AgentResult
+from backend.pipeline.state import PipelineState
+
+logger = logging.getLogger(__name__)
+
+MAX_RETRIES = 3
+
+
+class BaseAgentNode(ABC):
+    """Abstract base class for pipeline agent nodes."""
+
+    def __init__(
+        self,
+        name: str,
+        role: str,
+        description: str,
+        llm_model: str = "gpt-4o-mini",
+        router: LLMRouter | None = None,
+    ):
+        self.name = name
+        self.role = role
+        self.description = description
+        self.llm_model = llm_model
+        self.router = router or llm_router
+
+    @abstractmethod
+    def build_messages(self, state: PipelineState) -> list[dict]:
+        """Build the LLM messages for this agent."""
+
+    def get_complexity(self) -> TaskComplexity:
+        """Determine task complexity based on the agent's LLM model."""
+        model_lower = self.llm_model.lower()
+        if "mini" in model_lower or "haiku" in model_lower:
+            return TaskComplexity.SIMPLE
+        elif "opus" in model_lower:
+            return TaskComplexity.COMPLEX
+        return TaskComplexity.STANDARD
+
+    async def execute(self, state: PipelineState) -> PipelineState:
+        """Execute this agent node. Called by LangGraph."""
+        start_time = time.time()
+
+        for attempt in range(1, MAX_RETRIES + 1):
+            try:
+                messages = self.build_messages(state)
+                response: LLMResponse = await self.router.generate(
+                    messages=messages,
+                    complexity=self.get_complexity(),
+                    max_tokens=4096,
+                    temperature=0.7,
+                )
+
+                duration = time.time() - start_time
+                result = AgentResult(
+                    agent_name=self.name,
+                    role=self.role,
+                    content=response.content,
+                    tokens_used=response.usage.get("total_tokens", 0),
+                    cost_estimate=response.cost_estimate,
+                    duration_seconds=round(duration, 2),
+                    status="success",
+                )
+
+                logger.info(f"Agent '{self.name}' completed in {duration:.2f}s")
+                return {
+                    "agent_results": [result.model_dump()],
+                    "current_step": state["current_step"] + 1,
+                    "cost_total": state["cost_total"] + response.cost_estimate,
+                    "current_agent": self.name,
+                }
+
+            except Exception as e:
+                logger.warning(f"Agent '{self.name}' attempt {attempt}/{MAX_RETRIES} failed: {e}")
+                if attempt == MAX_RETRIES:
+                    duration = time.time() - start_time
+                    result = AgentResult(
+                        agent_name=self.name,
+                        role=self.role,
+                        content="",
+                        duration_seconds=round(duration, 2),
+                        status="failed",
+                        error=str(e),
+                    )
+                    return {
+                        "agent_results": [result.model_dump()],
+                        "errors": [f"Agent '{self.name}' failed after {MAX_RETRIES} retries: {e}"],
+                        "current_step": state["current_step"] + 1,
+                        "current_agent": self.name,
+                    }
+
+        # Should never reach here but satisfy type checker
+        return {"current_step": state["current_step"] + 1}
