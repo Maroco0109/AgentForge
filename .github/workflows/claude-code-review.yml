@@ -56,4 +56,30 @@ jobs:
 
             리뷰 완료 후 반드시 `gh pr comment ${{ github.event.pull_request.number }}`로 리뷰 결과를 코멘트로 남기세요.
 
+            ## 기계용 구조화 출력
+            리뷰 완료 후, 별도 `gh pr comment ${{ github.event.pull_request.number }}`로 아래 JSON 블록을 포함한 코멘트를 추가 작성하세요:
+
+            <!-- AGENTFORGE_REVIEW_RESULT -->
+            ```json
+            {
+              "review_version": 1,
+              "has_critical": true/false,
+              "issues": [
+                {
+                  "severity": "critical|warning|suggestion",
+                  "file": "path/to/file",
+                  "line": 42,
+                  "description": "이슈 설명",
+                  "suggested_fix": "수정 방향"
+                }
+              ],
+              "auto_fixable": true/false
+            }
+            ```
+            <!-- /AGENTFORGE_REVIEW_RESULT -->
+
+            - `auto_fixable=true`: 코드 수정으로 해결 가능한 이슈 (버그, 타입 오류, 누락된 import 등)
+            - `auto_fixable=false`: 설계 결정이 필요한 이슈 (아키텍처, 보안 정책 등)
+            - Critical 이슈가 없으면 `has_critical: false`, `issues: []`, `auto_fixable: false`
+
           claude_args: '--model claude-sonnet-4-6 --allowed-tools "Bash(gh issue view:*),Bash(gh search:*),Bash(gh issue list:*),Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr list:*)"'
