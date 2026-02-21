@@ -181,8 +181,6 @@ class PipelineOrchestrator:
 
         if failed_agents and len(failed_agents) == len(agent_results):
             status = "failed"
-        elif errors:
-            status = "completed"  # partial success
         else:
             status = "completed"
 

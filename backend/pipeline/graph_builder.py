@@ -63,12 +63,16 @@ class PipelineGraphBuilder:
         graph = StateGraph(PipelineState)
         node_names: list[str] = []
 
+        name_counts: dict[str, int] = {}
         for agent_spec in agents:
             node = self._create_node(agent_spec)
             node_name = agent_spec.name
-            # Ensure unique node names
-            if node_name in node_names:
-                node_name = f"{node_name}_{len(node_names)}"
+            # Ensure unique node names with counter
+            if node_name in name_counts:
+                name_counts[node_name] += 1
+                node_name = f"{node_name}_{name_counts[node_name]}"
+            else:
+                name_counts[node_name] = 0
             graph.add_node(node_name, node.execute)
             node_names.append(node_name)
 

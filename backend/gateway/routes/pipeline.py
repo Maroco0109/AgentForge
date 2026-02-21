@@ -91,7 +91,10 @@ async def execute_pipeline(
 
 
 @router.get("/pipelines/{pipeline_id}/status", response_model=PipelineStatusResponse)
-async def get_pipeline_status(pipeline_id: str) -> PipelineStatusResponse:
+async def get_pipeline_status(
+    pipeline_id: str,
+    current_user: User = Depends(get_current_user),
+) -> PipelineStatusResponse:
     """Get the status of a pipeline execution."""
     run = _pipeline_runs.get(pipeline_id)
     if not run:
@@ -107,7 +110,10 @@ async def get_pipeline_status(pipeline_id: str) -> PipelineStatusResponse:
 
 
 @router.get("/pipelines/{pipeline_id}/result")
-async def get_pipeline_result(pipeline_id: str) -> PipelineResult:
+async def get_pipeline_result(
+    pipeline_id: str,
+    current_user: User = Depends(get_current_user),
+) -> PipelineResult:
     """Get the result of a completed pipeline execution."""
     run = _pipeline_runs.get(pipeline_id)
     if not run:
