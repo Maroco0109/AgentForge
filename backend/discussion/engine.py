@@ -1,6 +1,7 @@
 """Discussion Engine - Main entry point for user interactions."""
 
 import logging
+import re
 
 from backend.discussion.critique_agent import CritiqueAgent, CritiqueResult
 from backend.discussion.design_generator import DesignGenerator, DesignProposal
@@ -14,6 +15,21 @@ from backend.discussion.state_machine import (
 from backend.shared.security import sanitize_and_isolate
 
 logger = logging.getLogger(__name__)
+
+# Korean satisfaction signals use substring matching (no word boundary concept).
+# English signals use word-boundary regex to prevent false positives like "not ok".
+_KOREAN_SATISFACTION = [
+    "좋아",
+    "괜찮",
+    "확인",
+    "선택",
+    "결정",
+    "이걸로",
+    "이것으로",
+    "승인",
+    "동의",
+]
+_ENGLISH_SATISFACTION_RE = re.compile(r"\b(?:ok|good|confirm|select|choose)\b", re.IGNORECASE)
 
 
 class DiscussionEngine:
@@ -34,6 +50,7 @@ class DiscussionEngine:
         self._current_intent: IntentResult | None = None
         self._current_designs: list[DesignProposal] = []
         self._current_critiques: list[CritiqueResult] = []
+        self._selected_design: DesignProposal | None = None
 
     async def process_message(self, user_input: str) -> dict:
         """Process a user message through the discussion engine.
@@ -93,6 +110,7 @@ class DiscussionEngine:
         self._current_intent = None
         self._current_designs = []
         self._current_critiques = []
+        self._selected_design = None
         return await self.process_message(user_input)
 
     async def process_user_input(self, user_input: str) -> dict:
@@ -206,25 +224,11 @@ class DiscussionEngine:
         """Handle DEBATE state: process user feedback."""
         input_lower = user_input.lower()
 
-        # Check for satisfaction signals
-        satisfaction_signals = [
-            "좋아",
-            "괜찮",
-            "확인",
-            "선택",
-            "결정",
-            "ok",
-            "good",
-            "confirm",
-            "select",
-            "choose",
-            "이걸로",
-            "이것으로",
-            "승인",
-            "동의",
-        ]
+        # Check for satisfaction signals using word boundaries for English
+        korean_match = any(signal in input_lower for signal in _KOREAN_SATISFACTION)
+        english_match = bool(_ENGLISH_SATISFACTION_RE.search(input_lower))
 
-        if any(signal in input_lower for signal in satisfaction_signals):
+        if korean_match or english_match:
             # User is satisfied
             self.memory.add_agreement(f"User approved design: {user_input}")
             self.state_machine.transition("user_satisfied")
@@ -324,27 +328,26 @@ class DiscussionEngine:
                 "state": DiscussionState.CONFIRM.value,
             }
 
+        # Store selected design for _handle_plan to use directly
+        self._selected_design = selected_design
         self.memory.add_agreement(f"Final design selected: {selected_design.name}")
 
-        # Transition to PLAN
+        # Transition to PLAN and immediately generate plan
         self.state_machine.transition("user_confirmed")
 
-        return {
-            "type": "design_confirmed",
-            "content": f"'{selected_design.name}' 설계안이 확정되었습니다. 실행 계획을 생성합니다.",
-            "selected_design": selected_design.model_dump(),
-            "state": DiscussionState.PLAN.value,
-            "memory": self.memory.to_dict(),
-        }
+        return await self._handle_plan()
 
     async def _handle_plan(self) -> dict:
         """Handle PLAN state: generate implementation plan."""
-        # Find the confirmed design
-        selected_design = None
-        for design in self._current_designs:
-            if any(design.name in agreement for agreement in self.memory.agreements):
-                selected_design = design
-                break
+        # Use directly stored design from _handle_confirm
+        selected_design = self._selected_design
+
+        # Fallback: search in designs if _selected_design not set
+        if selected_design is None:
+            for design in self._current_designs:
+                if any(design.name in agreement for agreement in self.memory.agreements):
+                    selected_design = design
+                    break
 
         if selected_design is None and self._current_designs:
             selected_design = self._current_designs[0]
