@@ -17,9 +17,11 @@ jobs:
       - uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          model: claude-sonnet-4-5-20250929
           prompt: |
             Review this PR focusing on:
             - Critical: bugs, security (OWASP Top 10), prompt injection risks
             - Important: code quality, error handling, test coverage
             - Agent-specific: LLM prompt safety, cost efficiency, timeout handling
+            Please write the review in Korean.
           allowed_tools: 'Bash(gh pr diff),Bash(gh pr view),Bash(gh pr comment)'
