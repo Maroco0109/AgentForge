@@ -1,12 +1,28 @@
-"""WebSocket chat endpoint."""
+"""WebSocket chat endpoint with role-based limits."""
 
 import json
+import logging
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, WebSocketException, status
+
+from backend.gateway.auth import decode_token
+from backend.gateway.rate_limiter import (
+    get_redis,
+    ws_release_connection,
+    ws_track_connection,
+)
+from backend.gateway.rbac import get_permission, is_unlimited
+from backend.shared.models import UserRole
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+# Hard server-level cap matches uvicorn --ws-max-size (ADMIN tier max).
+# Per-role limits are enforced in the handler as defense-in-depth.
+WS_ABSOLUTE_MAX_SIZE = 1_048_576  # 1MB
 
 
 class ConnectionManager:
@@ -41,16 +57,97 @@ class ConnectionManager:
 manager = ConnectionManager()
 
 
-@router.websocket("/ws/chat/{conversation_id}")
-async def websocket_chat_endpoint(websocket: WebSocket, conversation_id: uuid.UUID) -> None:
-    """WebSocket endpoint for chat conversations."""
-    client_id = str(uuid.uuid4())
-    await manager.connect(websocket, client_id)
+def _authenticate_ws(websocket: WebSocket) -> tuple[str, UserRole]:
+    """Authenticate a WebSocket connection via query parameter token.
+
+    Args:
+        websocket: The WebSocket connection.
+
+    Returns:
+        Tuple of (user_id, role).
+
+    Raises:
+        WebSocketException: If authentication fails.
+    """
+    token = websocket.query_params.get("token")
+    if not token:
+        raise WebSocketException(
+            code=status.WS_1008_POLICY_VIOLATION,
+            reason="Missing authentication token",
+        )
 
     try:
+        payload = decode_token(token)
+    except Exception:
+        raise WebSocketException(
+            code=status.WS_1008_POLICY_VIOLATION,
+            reason="Invalid or expired token",
+        )
+
+    if payload.get("type") != "access":
+        raise WebSocketException(
+            code=status.WS_1008_POLICY_VIOLATION,
+            reason="Invalid token type",
+        )
+
+    user_id = payload.get("sub")
+    role_str = payload.get("role", "free")
+
+    try:
+        role = UserRole(role_str)
+    except ValueError:
+        role = UserRole.FREE
+
+    return user_id, role
+
+
+@router.websocket("/ws/chat/{conversation_id}")
+async def websocket_chat_endpoint(websocket: WebSocket, conversation_id: uuid.UUID) -> None:
+    """WebSocket endpoint for chat conversations.
+
+    Authentication: Pass JWT token as query parameter `?token=<access_token>`.
+    Enforces per-role message size limits and connection count limits.
+    """
+    # Authenticate
+    user_id, role = _authenticate_ws(websocket)
+
+    # Check connection limit
+    max_connections = get_permission(role, "ws_max_connections")
+    redis = get_redis()
+    allowed = await ws_track_connection(redis, user_id, max_connections)
+    if not allowed:
+        await websocket.close(
+            code=status.WS_1013_TRY_AGAIN_LATER,
+            reason="Too many concurrent connections",
+        )
+        return
+
+    max_message_size = get_permission(role, "ws_max_message_size")
+    client_id = str(uuid.uuid4())
+
+    try:
+        await manager.connect(websocket, client_id)
+
         while True:
-            # Receive message from client
-            data = await websocket.receive_text()
+            # Receive raw ASGI message for early size check before processing.
+            # Server-level --ws-max-size caps frames at WS_ABSOLUTE_MAX_SIZE;
+            # this per-role check is defense-in-depth.
+            raw = await websocket.receive()
+            if raw["type"] == "websocket.disconnect":
+                break
+
+            data = raw.get("text", "")
+            if not data and "bytes" in raw and raw["bytes"]:
+                data = raw["bytes"].decode("utf-8", errors="replace")
+
+            # Check message size against role limit
+            msg_byte_len = len(data.encode("utf-8"))
+            if not is_unlimited(max_message_size) and msg_byte_len > max_message_size:
+                await websocket.close(
+                    code=1009,  # Message Too Big
+                    reason=f"Message exceeds maximum size of {max_message_size} bytes",
+                )
+                break
 
             try:
                 message_data = json.loads(data)
@@ -70,7 +167,7 @@ async def websocket_chat_endpoint(websocket: WebSocket, conversation_id: uuid.UU
                 )
 
                 # Placeholder: Echo back as assistant response
-                # In Phase 2, this will call the LLM/agent pipeline
+                # In later phases, this will call the LLM/agent pipeline
                 assistant_response = f"Assistant echo: {user_message}"
                 await manager.send_personal_message(
                     json.dumps(
@@ -98,4 +195,7 @@ async def websocket_chat_endpoint(websocket: WebSocket, conversation_id: uuid.UU
                 )
 
     except WebSocketDisconnect:
+        pass
+    finally:
         manager.disconnect(client_id)
+        await ws_release_connection(redis, user_id)
