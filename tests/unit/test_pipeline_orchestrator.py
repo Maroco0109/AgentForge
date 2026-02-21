@@ -71,6 +71,7 @@ class TestPipelineOrchestrator:
         assert isinstance(result, PipelineResult)
         assert result.status == "completed"
         assert result.design_name == "Test Pipeline"
+        assert len(result.agent_results) == 3  # All 3 agents accumulated
         mock_builder.build.assert_called_once()
 
     @patch("backend.pipeline.orchestrator.PipelineGraphBuilder")

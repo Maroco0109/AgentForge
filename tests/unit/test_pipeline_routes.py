@@ -2,18 +2,35 @@
 
 from __future__ import annotations
 
+import uuid
 from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
 
+from backend.gateway.auth import get_current_user
 from backend.gateway.main import app
 from backend.pipeline.result import PipelineResult
+from backend.shared.models import User, UserRole
+
+
+def _mock_current_user() -> User:
+    """Create a mock authenticated user."""
+    user = User(
+        id=uuid.uuid4(),
+        email="test@example.com",
+        hashed_password="hashed",
+        display_name="Test User",
+        role=UserRole.FREE,
+    )
+    return user
 
 
 @pytest.fixture
 def client():
-    return TestClient(app, raise_server_exceptions=False)
+    app.dependency_overrides[get_current_user] = _mock_current_user
+    yield TestClient(app, raise_server_exceptions=False)
+    app.dependency_overrides.clear()
 
 
 def _make_design_dict() -> dict:

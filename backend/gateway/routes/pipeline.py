@@ -2,23 +2,27 @@
 
 from __future__ import annotations
 
+import collections
 import logging
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from backend.discussion.design_generator import DesignProposal
+from backend.gateway.auth import get_current_user
 from backend.pipeline.orchestrator import PipelineOrchestrator
 from backend.pipeline.result import PipelineResult
+from backend.shared.models import User
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# In-memory storage for pipeline runs (replaced with DB in Phase 7)
-_pipeline_runs: dict[str, dict] = {}
+# In-memory storage for pipeline runs with max 1000 entries (replaced with DB in Phase 7)
+_MAX_PIPELINE_RUNS = 1000
+_pipeline_runs: collections.OrderedDict[str, dict] = collections.OrderedDict()
 
 
 class PipelineExecuteRequest(BaseModel):
@@ -38,13 +42,21 @@ class PipelineStatusResponse(BaseModel):
 
 
 @router.post("/pipelines/execute", response_model=PipelineStatusResponse)
-async def execute_pipeline(request: PipelineExecuteRequest) -> PipelineStatusResponse:
+async def execute_pipeline(
+    request: PipelineExecuteRequest,
+    current_user: User = Depends(get_current_user),
+) -> PipelineStatusResponse:
     """Execute a pipeline from a design proposal.
 
-    Currently runs synchronously. Phase 7 will add background execution.
+    Requires authentication. Currently runs synchronously.
+    Phase 7 will add background execution.
     """
     pipeline_id = str(uuid.uuid4())
     started_at = datetime.now(timezone.utc).isoformat()
+
+    # Evict oldest entries if at capacity
+    while len(_pipeline_runs) >= _MAX_PIPELINE_RUNS:
+        _pipeline_runs.popitem(last=False)
 
     _pipeline_runs[pipeline_id] = {
         "status": "running",

@@ -22,7 +22,7 @@ dependencies = [
     "anthropic==0.40.0",
     "tiktoken==0.8.0",
     "langgraph>=0.4.5",
-    "langchain-core>=0.2.27,<0.3",
+    "langchain-core>=0.3.0",
     "typing-extensions>=4.12.0",
 ]
 

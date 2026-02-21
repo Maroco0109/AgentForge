@@ -90,7 +90,7 @@ class PipelineOrchestrator:
                 self._run_graph(compiled_graph, initial_state, on_status),
                 timeout=timeout,
             )
-        except TimeoutError:
+        except asyncio.TimeoutError:
             logger.warning(f"Pipeline '{design.name}' timed out after {timeout}s")
             if on_status:
                 await self._notify(
@@ -124,7 +124,7 @@ class PipelineOrchestrator:
             )
 
         # Build result from final state
-        return self._build_result(design.name, final_state, start_time, on_status)
+        return self._build_result(design.name, final_state, start_time)
 
     async def _run_graph(
         self,
@@ -133,12 +133,21 @@ class PipelineOrchestrator:
         on_status: Callable[[dict], Any] | None,
     ) -> dict:
         """Run the compiled graph and stream status updates."""
-        final_state = {}
+        final_state: dict = dict(initial_state)
         async for event in compiled_graph.astream(initial_state):
-            # LangGraph streams events as {node_name: state_update}
             for node_name, state_update in event.items():
-                final_state.update(state_update)
-                if on_status and isinstance(state_update, dict):
+                if not isinstance(state_update, dict):
+                    continue
+                # Accumulate list fields (mirrors LangGraph reducer behavior)
+                for key in ("agent_results", "errors"):
+                    if key in state_update:
+                        final_state.setdefault(key, []).extend(state_update[key])
+                # Overwrite scalar fields
+                for key, value in state_update.items():
+                    if key not in ("agent_results", "errors"):
+                        final_state[key] = value
+
+                if on_status:
                     agent_results = state_update.get("agent_results", [])
                     for result in agent_results:
                         await self._notify(
@@ -157,7 +166,6 @@ class PipelineOrchestrator:
         design_name: str,
         final_state: dict,
         start_time: float,
-        on_status: Callable[[dict], Any] | None,
     ) -> PipelineResult:
         """Build PipelineResult from final graph state."""
         agent_results_raw = final_state.get("agent_results", [])

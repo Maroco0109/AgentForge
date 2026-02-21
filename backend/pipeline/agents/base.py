@@ -9,6 +9,7 @@ from abc import ABC, abstractmethod
 from backend.pipeline.llm_router import LLMResponse, LLMRouter, TaskComplexity, llm_router
 from backend.pipeline.result import AgentResult
 from backend.pipeline.state import PipelineState
+from backend.shared.security import input_sanitizer
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +49,15 @@ class BaseAgentNode(ABC):
     async def execute(self, state: PipelineState) -> PipelineState:
         """Execute this agent node. Called by LangGraph."""
         start_time = time.time()
+
+        # Check design data for injection patterns
+        design_text = str(state.get("design", {}))
+        is_safe, matches = input_sanitizer.check(design_text)
+        if not is_safe:
+            logger.warning(
+                f"Agent '{self.name}': potential injection in design data "
+                f"({len(matches)} pattern(s))"
+            )
 
         for attempt in range(1, MAX_RETRIES + 1):
             try:
