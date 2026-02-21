@@ -57,6 +57,17 @@ class ConversationResponse(BaseModel):
         from_attributes = True
 
 
+class ConversationDetailResponse(ConversationResponse):
+    """Schema for conversation detail response with messages."""
+
+    messages: list["MessageResponse"]
+
+    class Config:
+        """Pydantic config."""
+
+        from_attributes = True
+
+
 # Message schemas
 class MessageCreate(BaseModel):
     """Schema for creating a message."""

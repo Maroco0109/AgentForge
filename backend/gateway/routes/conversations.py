@@ -9,7 +9,12 @@ from sqlalchemy.orm import selectinload
 
 from backend.shared.database import get_db
 from backend.shared.models import Conversation
-from backend.shared.schemas import ConversationCreate, ConversationResponse, MessageResponse
+from backend.shared.schemas import (
+    ConversationCreate,
+    ConversationDetailResponse,
+    ConversationResponse,
+    MessageResponse,
+)
 
 router = APIRouter()
 
@@ -49,7 +54,7 @@ async def list_conversations(
     return list(conversations)
 
 
-@router.get("/conversations/{conversation_id}")
+@router.get("/conversations/{conversation_id}", response_model=ConversationDetailResponse)
 async def get_conversation(
     conversation_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),

@@ -2,7 +2,7 @@
 
 import json
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
@@ -33,7 +33,7 @@ class ConnectionManager:
 
     async def broadcast(self, message: str) -> None:
         """Broadcast a message to all connected clients."""
-        for connection in self.active_connections.values():
+        for connection in list(self.active_connections.values()):
             await connection.send_text(message)
 
 
@@ -63,7 +63,7 @@ async def websocket_chat_endpoint(websocket: WebSocket, conversation_id: uuid.UU
                             "type": "user_message_received",
                             "content": user_message,
                             "conversation_id": str(conversation_id),
-                            "timestamp": datetime.utcnow().isoformat(),
+                            "timestamp": datetime.now(timezone.utc).isoformat(),
                         }
                     ),
                     client_id,
@@ -78,7 +78,7 @@ async def websocket_chat_endpoint(websocket: WebSocket, conversation_id: uuid.UU
                             "type": "assistant_message",
                             "content": assistant_response,
                             "conversation_id": str(conversation_id),
-                            "timestamp": datetime.utcnow().isoformat(),
+                            "timestamp": datetime.now(timezone.utc).isoformat(),
                         }
                     ),
                     client_id,
@@ -91,7 +91,7 @@ async def websocket_chat_endpoint(websocket: WebSocket, conversation_id: uuid.UU
                         {
                             "type": "error",
                             "content": "Invalid message format",
-                            "timestamp": datetime.utcnow().isoformat(),
+                            "timestamp": datetime.now(timezone.utc).isoformat(),
                         }
                     ),
                     client_id,
