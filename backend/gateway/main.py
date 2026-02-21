@@ -10,7 +10,7 @@ from backend.shared.config import settings
 from backend.shared.database import init_db
 from backend.shared.schemas import HealthResponse
 
-from .routes import chat, conversations
+from .routes import auth, chat, conversations
 
 
 @asynccontextmanager
@@ -40,6 +40,7 @@ app.add_middleware(
 )
 
 # Include routers
+app.include_router(auth.router, prefix="/api/v1", tags=["auth"])
 app.include_router(chat.router, prefix="/api/v1", tags=["chat"])
 app.include_router(conversations.router, prefix="/api/v1", tags=["conversations"])
 
