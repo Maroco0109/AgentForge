@@ -4,7 +4,7 @@ import re
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, EmailStr, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -29,7 +29,7 @@ class RegisterRequest(BaseModel):
 
     email: EmailStr
     password: str
-    display_name: str
+    display_name: str = Field(min_length=2, max_length=100)
 
     @field_validator("password")
     @classmethod
@@ -63,6 +63,15 @@ class RefreshRequest(BaseModel):
     """Schema for token refresh."""
 
     refresh_token: str
+
+
+class UserResponse(BaseModel):
+    """Schema for user profile response."""
+
+    id: str
+    email: str
+    display_name: str
+    role: str
 
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
@@ -147,12 +156,12 @@ async def refresh_token(request: RefreshRequest, db: AsyncSession = Depends(get_
     return TokenResponse(access_token=access_token, refresh_token=new_refresh_token)
 
 
-@router.get("/me")
+@router.get("/me", response_model=UserResponse)
 async def get_me(current_user: User = Depends(get_current_user)):
     """Get current user profile."""
-    return {
-        "id": str(current_user.id),
-        "email": current_user.email,
-        "display_name": current_user.display_name,
-        "role": current_user.role.value,
-    }
+    return UserResponse(
+        id=str(current_user.id),
+        email=current_user.email,
+        display_name=current_user.display_name,
+        role=current_user.role.value,
+    )

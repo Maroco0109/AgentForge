@@ -72,7 +72,7 @@ Content-Type: application/json
 - 이메일: 유효한 이메일 형식
 - 비밀번호: 최소 8자, 대문자, 소문자, 숫자 포함
 - display_name: 2-100자, 한글/영문 혼합 허용
-- 이메일 중복 검사: 기존 사용자 존재 시 400 Bad Request
+- 이메일 중복 검사: 기존 사용자 존재 시 409 Conflict
 
 ### 사용자 로그인
 
@@ -159,7 +159,7 @@ Authorization: Bearer <access_token>
 
 ## JWT 토큰 구조
 
-### Access Token (15분 유효)
+### Access Token (30분 유효)
 
 ```
 Header:
@@ -207,7 +207,7 @@ SECRET_KEY=your-very-long-random-secret-key-min-32-chars
 
 # JWT 설정
 JWT_ALGORITHM=HS256
-JWT_ACCESS_TOKEN_EXPIRE_MINUTES=15
+JWT_ACCESS_TOKEN_EXPIRE_MINUTES=30
 JWT_REFRESH_TOKEN_EXPIRE_DAYS=7
 
 # 기타
@@ -217,7 +217,7 @@ DEBUG=False  # 프로덕션에서는 False
 **개발 환경 기본값:**
 - `SECRET_KEY`: "dev-secret-key-change-in-production"
 - `JWT_ALGORITHM`: "HS256"
-- `JWT_ACCESS_TOKEN_EXPIRE_MINUTES`: 15
+- `JWT_ACCESS_TOKEN_EXPIRE_MINUTES`: 30
 - `JWT_REFRESH_TOKEN_EXPIRE_DAYS`: 7
 - `DEBUG`: True
 
@@ -342,7 +342,7 @@ export async function authenticatedFetch(
 
 1. **비밀번호 해싱**: bcrypt를 사용한 강력한 해싱 (salting 자동)
 2. **JWT 서명**: HS256 알고리즘으로 서명된 토큰
-3. **토큰 유효기간**: Access Token (15분), Refresh Token (7일)
+3. **토큰 유효기간**: Access Token (30분), Refresh Token (7일)
 4. **CORS**: 프론트엔드 도메인만 허용
 5. **HTTPS**: 프로덕션에서는 필수 (쿠키 설정 시)
 
