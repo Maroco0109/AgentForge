@@ -250,7 +250,7 @@ class DesignGenerator:
                 return self.generate_designs_fallback({})
 
             return designs
-        except (json.JSONDecodeError, IndexError, KeyError) as e:
+        except (json.JSONDecodeError, IndexError, KeyError, ValueError) as e:
             logger.error(f"Failed to parse design response: {e}")
             return self.generate_designs_fallback({})
 

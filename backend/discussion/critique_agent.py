@@ -267,6 +267,6 @@ class CritiqueAgent:
                 return self.critique_designs_fallback(designs, {})
 
             return results
-        except (json.JSONDecodeError, IndexError, KeyError) as e:
+        except (json.JSONDecodeError, IndexError, KeyError, ValueError) as e:
             logger.error(f"Failed to parse critique response: {e}")
             return self.critique_designs_fallback(designs, {})
