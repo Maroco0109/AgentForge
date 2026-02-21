@@ -61,7 +61,12 @@ def create_refresh_token(user_id: str) -> str:
 def decode_token(token: str) -> dict:
     """Decode and validate a JWT token."""
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+        payload = jwt.decode(
+            token,
+            settings.SECRET_KEY,
+            algorithms=[settings.JWT_ALGORITHM],
+            options={"require": ["exp", "sub"]},
+        )
         return payload
     except jwt.ExpiredSignatureError:
         raise HTTPException(

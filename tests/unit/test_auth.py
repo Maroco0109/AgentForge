@@ -74,13 +74,15 @@ class TestAccessToken:
         """Test that access token has correct expiration time."""
         user_id = str(uuid.uuid4())
         role = "free"
-        before = datetime.now(timezone.utc)
+        before = datetime.now(timezone.utc).replace(microsecond=0)
         token = create_access_token(user_id, role)
-        after = datetime.now(timezone.utc)
+        after = datetime.now(timezone.utc).replace(microsecond=0) + timedelta(seconds=2)
 
         payload = jwt.decode(token, options={"verify_signature": False})
         exp = datetime.fromtimestamp(payload["exp"], tz=timezone.utc)
-        iat = datetime.fromtimestamp(payload["iat"], tz=timezone.utc)
+        iat = datetime.fromtimestamp(payload["iat"], tz=timezone.utc).replace(
+            microsecond=0
+        )
 
         # Check expiration is ~30 minutes from now (default setting)
         expected_exp = before + timedelta(
@@ -88,7 +90,7 @@ class TestAccessToken:
         )
         assert abs((exp - expected_exp).total_seconds()) < 5
 
-        # Check issued time is approximately now
+        # Check issued time is approximately now (with 2 second tolerance, no microseconds)
         assert before <= iat <= after
 
     def test_decode_valid_access_token(self):
@@ -175,19 +177,21 @@ class TestRefreshToken:
     def test_create_refresh_token_expiration(self):
         """Test that refresh token has correct expiration time."""
         user_id = str(uuid.uuid4())
-        before = datetime.now(timezone.utc)
+        before = datetime.now(timezone.utc).replace(microsecond=0)
         token = create_refresh_token(user_id)
-        after = datetime.now(timezone.utc)
+        after = datetime.now(timezone.utc).replace(microsecond=0) + timedelta(seconds=2)
 
         payload = jwt.decode(token, options={"verify_signature": False})
         exp = datetime.fromtimestamp(payload["exp"], tz=timezone.utc)
-        iat = datetime.fromtimestamp(payload["iat"], tz=timezone.utc)
+        iat = datetime.fromtimestamp(payload["iat"], tz=timezone.utc).replace(
+            microsecond=0
+        )
 
         # Check expiration is ~7 days from now (default setting)
         expected_exp = before + timedelta(days=settings.JWT_REFRESH_TOKEN_EXPIRE_DAYS)
         assert abs((exp - expected_exp).total_seconds()) < 5
 
-        # Check issued time is approximately now
+        # Check issued time is approximately now (with 2 second tolerance, no microseconds)
         assert before <= iat <= after
 
     def test_decode_valid_refresh_token(self):
@@ -248,7 +252,7 @@ class TestTokenEdgeCases:
             decode_token(token)
 
     def test_token_with_future_iat(self):
-        """Test token with future issued time (iat)."""
+        """Test token with future issued time (iat) is rejected."""
         user_id = str(uuid.uuid4())
         future_iat = datetime.now(timezone.utc) + timedelta(hours=1)
         future_exp = future_iat + timedelta(minutes=30)
@@ -264,6 +268,7 @@ class TestTokenEdgeCases:
             payload, settings.SECRET_KEY, algorithm=settings.JWT_ALGORITHM
         )
 
-        # Should still be valid if not expired
-        decoded = decode_token(token)
-        assert decoded["sub"] == user_id
+        # PyJWT validates iat by default and rejects future iat
+        with pytest.raises(HTTPException) as exc_info:
+            decode_token(token)
+        assert exc_info.value.status_code == 401
