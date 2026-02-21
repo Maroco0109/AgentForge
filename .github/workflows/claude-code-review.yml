@@ -50,7 +50,10 @@ jobs:
 
             ## 리뷰 가이드라인
             - `gh pr diff ${{ github.event.pull_request.number }}`로 실제 변경사항 확인
+            - 파일 존재 여부는 `ls`, `cat`으로 검증
             - 심각도 표시: Critical, Warning, Suggestion
             - 한국어로 리뷰 작성
+
+            리뷰 완료 후 반드시 `gh pr comment ${{ github.event.pull_request.number }}`로 리뷰 결과를 코멘트로 남기세요.
 
           claude_args: '--model claude-sonnet-4-6 --allowed-tools "Bash(gh issue view:*),Bash(gh search:*),Bash(gh issue list:*),Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr list:*)"'
