@@ -2,6 +2,7 @@
 
 import enum
 import ipaddress
+import socket
 from datetime import datetime
 from urllib.parse import urlparse
 
@@ -32,6 +33,25 @@ class ComplianceStatus(str, enum.Enum):
     UNCHECKED = "unchecked"
 
 
+BLOCKED_HOSTNAMES = {
+    "localhost",
+    "metadata.google.internal",
+    "metadata.aws.internal",
+}
+BLOCKED_SUFFIXES = (".internal", ".local", ".localhost")
+
+
+def _is_private_ip(ip_str: str) -> bool:
+    """Check if an IP address is private/internal."""
+    try:
+        ip = ipaddress.ip_address(ip_str)
+        return (
+            ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_multicast or ip.is_reserved
+        )
+    except ValueError:
+        return False
+
+
 class CollectionCreateRequest(BaseModel):
     url: str | None = None
     source_type: SourceType = SourceType.WEB
@@ -40,7 +60,7 @@ class CollectionCreateRequest(BaseModel):
     @field_validator("url")
     @classmethod
     def validate_url_not_private(cls, v: str | None) -> str | None:
-        """Prevent SSRF by blocking private/internal IPs."""
+        """Prevent SSRF by blocking private/internal IPs and hostnames."""
         if v is None:
             return v
 
@@ -51,10 +71,9 @@ class CollectionCreateRequest(BaseModel):
             if not hostname:
                 return v
 
-            # Try to parse as IP address
+            # Check literal IP address
             try:
                 ip = ipaddress.ip_address(hostname)
-                # Block private, loopback, link-local, multicast
                 if (
                     ip.is_private
                     or ip.is_loopback
@@ -66,25 +85,30 @@ class CollectionCreateRequest(BaseModel):
                         f"URL with private/internal IP address is not allowed: {hostname}"
                     )
             except ValueError as e:
-                # If it's a validation error from our check, re-raise
                 if "not allowed" in str(e):
                     raise
-                # Otherwise it's not a valid IP, which is fine (it's a hostname)
+                # Not a valid IP, it's a hostname - continue checking
                 pass
 
             # Block known internal hostnames
-            BLOCKED_HOSTNAMES = {
-                "localhost",
-                "metadata.google.internal",
-                "metadata.aws.internal",
-            }
-            BLOCKED_SUFFIXES = (".internal", ".local", ".localhost")
-
             hostname_lower = hostname.lower()
             if hostname_lower in BLOCKED_HOSTNAMES:
                 raise ValueError(f"URL with internal hostname is not allowed: {hostname}")
             if any(hostname_lower.endswith(suffix) for suffix in BLOCKED_SUFFIXES):
                 raise ValueError(f"URL with internal hostname is not allowed: {hostname}")
+
+            # DNS resolution check: resolve hostname and verify resolved IPs are not private
+            try:
+                addrinfo = socket.getaddrinfo(hostname, None, socket.AF_UNSPEC)
+                for family, _type, _proto, _canonname, sockaddr in addrinfo:
+                    resolved_ip = sockaddr[0]
+                    if _is_private_ip(resolved_ip):
+                        raise ValueError(
+                            f"URL hostname resolves to private IP: {hostname} -> {resolved_ip}"
+                        )
+            except socket.gaierror:
+                # DNS resolution failed - allow (will fail at request time)
+                pass
 
             return v
         except ValueError:

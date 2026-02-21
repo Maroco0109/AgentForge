@@ -31,13 +31,11 @@ class RobotsChecker:
             if parser is None:
                 return True, "robots.txt not found - assuming allowed"
 
+            # Agent-specific rule takes priority over wildcard
             allowed = parser.can_fetch(self.USER_AGENT, url)
 
             if not allowed:
-                # Also check with wildcard user agent
-                allowed_wildcard = parser.can_fetch("*", url)
-                if not allowed_wildcard:
-                    return False, f"Blocked by robots.txt for {parsed.netloc}"
+                return False, f"Blocked by robots.txt for {parsed.netloc}"
 
             # Check crawl delay
             crawl_delay = parser.crawl_delay(self.USER_AGENT)
