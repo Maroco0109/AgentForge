@@ -1,5 +1,6 @@
 """Data Collector microservice entry point."""
 
+import logging
 import uuid
 from datetime import datetime, timezone
 
@@ -21,6 +22,8 @@ from .schemas import (
     ComplianceStatus,
     SourceType,
 )
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="AgentForge Data Collector",
@@ -202,7 +205,8 @@ async def run_collection(collection_id: str) -> CollectionStatusResponse:
     except Exception as e:
         collection["status"] = CollectionStatus.FAILED
         collection["error"] = str(e)
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Collection failed: %s", e)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @app.get("/api/v1/collections/{collection_id}/data")

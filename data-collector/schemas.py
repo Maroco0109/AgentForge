@@ -72,6 +72,20 @@ class CollectionCreateRequest(BaseModel):
                 # Otherwise it's not a valid IP, which is fine (it's a hostname)
                 pass
 
+            # Block known internal hostnames
+            BLOCKED_HOSTNAMES = {
+                "localhost",
+                "metadata.google.internal",
+                "metadata.aws.internal",
+            }
+            BLOCKED_SUFFIXES = (".internal", ".local", ".localhost")
+
+            hostname_lower = hostname.lower()
+            if hostname_lower in BLOCKED_HOSTNAMES:
+                raise ValueError(f"URL with internal hostname is not allowed: {hostname}")
+            if any(hostname_lower.endswith(suffix) for suffix in BLOCKED_SUFFIXES):
+                raise ValueError(f"URL with internal hostname is not allowed: {hostname}")
+
             return v
         except ValueError:
             raise
