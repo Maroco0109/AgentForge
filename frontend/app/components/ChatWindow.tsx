@@ -37,13 +37,14 @@ export default function ChatWindow() {
     ws.onopen = () => {
       console.log("WebSocket connected");
       setIsConnected(true);
+      const isReconnect = reconnectAttemptsRef.current > 0;
       reconnectAttemptsRef.current = 0;
       setMessages((prev) => [
         ...prev,
         {
           id: crypto.randomUUID(),
           role: "system",
-          content: "Connected to AgentForge",
+          content: isReconnect ? "Reconnected to AgentForge" : "Connected to AgentForge",
           timestamp: new Date(),
         },
       ]);
