@@ -1,1 +1,1 @@
-"""Pipeline module for sequential agent processing."""
+"""Pipeline module for agent-based pipeline execution."""
