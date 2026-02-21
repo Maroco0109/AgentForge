@@ -1,0 +1,119 @@
+name: Auto-fix from Review
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  auto-fix:
+    # Only trigger on PR comments with review result marker from bot
+    if: |
+      github.event.issue.pull_request &&
+      contains(github.event.comment.body, '<!-- AGENTFORGE_REVIEW_RESULT -->') &&
+      contains(github.event.comment.body, '"has_critical": true') &&
+      contains(github.event.comment.body, '"auto_fixable": true')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: read
+      id-token: write
+
+    concurrency:
+      group: auto-fix-${{ github.event.issue.number }}
+      cancel-in-progress: true
+
+    steps:
+      - name: Get PR details
+        id: pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_JSON=$(gh api repos/${{ github.repository }}/pulls/${{ github.event.issue.number }})
+          echo "ref=$(echo $PR_JSON | jq -r '.head.ref')" >> $GITHUB_OUTPUT
+          echo "sha=$(echo $PR_JSON | jq -r '.head.sha')" >> $GITHUB_OUTPUT
+
+      - name: Check auto-fix iteration count
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Count fix(auto-review) commits on this PR
+          COMMITS=$(gh api repos/${{ github.repository }}/pulls/${{ github.event.issue.number }}/commits --jq '[.[] | select(.commit.message | startswith("fix(auto-review):"))] | length')
+          echo "fix_count=$COMMITS" >> $GITHUB_OUTPUT
+
+          if [ "$COMMITS" -ge 3 ]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "::warning::Auto-fix iteration limit reached (3). Requesting human review."
+
+            # Notify human
+            gh api repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments \
+              -f body="⚠️ **Auto-fix 반복 한도 초과 (3회)**
+
+            자동 수정으로 해결되지 않는 Critical 이슈가 있습니다. 사람의 검토가 필요합니다.
+
+            @${{ github.repository_owner }} 리뷰를 확인해주세요."
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Verify SHA freshness
+        id: verify
+        if: steps.check.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Get current HEAD SHA
+          CURRENT_SHA=$(gh api repos/${{ github.repository }}/pulls/${{ github.event.issue.number }} --jq '.head.sha')
+
+          # Check if someone pushed new commits after the review
+          if [ "$CURRENT_SHA" != "${{ steps.pr.outputs.sha }}" ]; then
+            echo "stale=true" >> $GITHUB_OUTPUT
+            echo "::warning::SHA mismatch - human may be working on this PR. Skipping auto-fix."
+          else
+            echo "stale=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Checkout PR branch
+        if: steps.check.outputs.skip != 'true' && steps.verify.outputs.stale != 'true'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.pr.outputs.ref }}
+          fetch-depth: 0
+
+      - name: Parse review issues
+        id: parse
+        if: steps.check.outputs.skip != 'true' && steps.verify.outputs.stale != 'true'
+        run: |
+          # Extract JSON from review comment
+          REVIEW_JSON=$(echo '${{ github.event.comment.body }}' | sed -n '/```json/,/```/p' | sed '1d;$d')
+          echo "review_json<<EOF" >> $GITHUB_OUTPUT
+          echo "$REVIEW_JSON" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Run Claude Code Auto-fix
+        if: steps.check.outputs.skip != 'true' && steps.verify.outputs.stale != 'true'
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            이 PR에서 Claude Code Review가 발견한 Critical 이슈를 수정하세요.
+
+            ## 리뷰 결과
+            ${{ steps.parse.outputs.review_json }}
+
+            ## 수정 규칙
+            1. Critical 심각도 이슈만 수정하세요 (Warning/Suggestion 무시)
+            2. 최소한의 변경만 하세요 - 리팩토링 금지
+            3. 각 수정 후 관련 테스트가 있으면 실행하여 검증
+            4. 수정이 불확실한 경우 수정하지 마세요
+            5. 커밋 메시지 prefix: `fix(auto-review):`
+
+            ## 수정 완료 후
+            1. `python -m pytest tests/ -v --tb=short`로 테스트 실행
+            2. 변경사항을 커밋하고 푸시하세요
+            3. 수정한 내용을 PR 코멘트로 남기세요 (gh pr comment 사용)
+
+            주의: AGENTFORGE_REVIEW_RESULT 마커를 코멘트에 포함하지 마세요.
+
+          claude_args: '--model claude-sonnet-4-6 --allowed-tools "Bash(git diff:*),Bash(git add:*),Bash(git commit:*),Bash(git push:*),Bash(gh pr comment:*),Bash(python -m pytest:*),Bash(cd * && python -m pytest:*),Bash(ruff check:*),Bash(ruff format:*),Read,Write,Edit"'
