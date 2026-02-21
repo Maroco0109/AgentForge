@@ -103,10 +103,9 @@ class TestCheckRateLimit:
         """Test that requests under the limit are allowed."""
         mock_pipe = AsyncMock()
         mock_pipe.zremrangebyscore = MagicMock()
-        mock_pipe.zadd = MagicMock()
         mock_pipe.zcard = MagicMock()
         mock_pipe.expire = MagicMock()
-        mock_pipe.execute = AsyncMock(return_value=[0, True, 5, True])  # 5 requests
+        mock_pipe.execute = AsyncMock(return_value=[0, 5, True])  # 5 requests
 
         mock_redis = AsyncMock()
         mock_redis.pipeline = MagicMock(return_value=mock_pipe)
@@ -116,7 +115,7 @@ class TestCheckRateLimit:
         )
 
         assert allowed is True
-        assert remaining == 5  # 10 - 5
+        assert remaining == 4  # 10 - 5 - 1 (current request)
         assert retry_after == 0
 
     @pytest.mark.asyncio
@@ -124,10 +123,9 @@ class TestCheckRateLimit:
         """Test that requests over the limit are denied."""
         mock_pipe = AsyncMock()
         mock_pipe.zremrangebyscore = MagicMock()
-        mock_pipe.zadd = MagicMock()
         mock_pipe.zcard = MagicMock()
         mock_pipe.expire = MagicMock()
-        mock_pipe.execute = AsyncMock(return_value=[0, True, 11, True])  # 11 requests
+        mock_pipe.execute = AsyncMock(return_value=[0, 11, True])  # 11 requests
 
         mock_redis = AsyncMock()
         mock_redis.pipeline = MagicMock(return_value=mock_pipe)
@@ -149,10 +147,9 @@ class TestCheckRateLimit:
         """Test denied response when no oldest entry found."""
         mock_pipe = AsyncMock()
         mock_pipe.zremrangebyscore = MagicMock()
-        mock_pipe.zadd = MagicMock()
         mock_pipe.zcard = MagicMock()
         mock_pipe.expire = MagicMock()
-        mock_pipe.execute = AsyncMock(return_value=[0, True, 11, True])
+        mock_pipe.execute = AsyncMock(return_value=[0, 11, True])
 
         mock_redis = AsyncMock()
         mock_redis.pipeline = MagicMock(return_value=mock_pipe)
@@ -167,35 +164,34 @@ class TestCheckRateLimit:
         assert retry_after == 60  # Falls back to full window
 
     @pytest.mark.asyncio
-    async def test_exactly_at_limit_is_allowed(self):
-        """Test that request count exactly at limit is allowed."""
+    async def test_exactly_at_limit_is_denied(self):
+        """Test that request count at limit is denied (>= check)."""
         mock_pipe = AsyncMock()
         mock_pipe.zremrangebyscore = MagicMock()
-        mock_pipe.zadd = MagicMock()
         mock_pipe.zcard = MagicMock()
         mock_pipe.expire = MagicMock()
-        mock_pipe.execute = AsyncMock(return_value=[0, True, 10, True])
+        mock_pipe.execute = AsyncMock(return_value=[0, 10, True])
 
         mock_redis = AsyncMock()
         mock_redis.pipeline = MagicMock(return_value=mock_pipe)
+        mock_redis.zrange = AsyncMock(return_value=[])
 
         allowed, remaining, retry_after = await check_rate_limit(
             mock_redis, "rate_limit:test", limit=10, window_seconds=60
         )
 
-        assert allowed is True
+        assert allowed is False
         assert remaining == 0
-        assert retry_after == 0
+        assert retry_after == 60
 
     @pytest.mark.asyncio
     async def test_custom_window_seconds(self):
         """Test rate limit with custom window duration."""
         mock_pipe = AsyncMock()
         mock_pipe.zremrangebyscore = MagicMock()
-        mock_pipe.zadd = MagicMock()
         mock_pipe.zcard = MagicMock()
         mock_pipe.expire = MagicMock()
-        mock_pipe.execute = AsyncMock(return_value=[0, True, 3, True])
+        mock_pipe.execute = AsyncMock(return_value=[0, 3, True])
 
         mock_redis = AsyncMock()
         mock_redis.pipeline = MagicMock(return_value=mock_pipe)
@@ -205,7 +201,7 @@ class TestCheckRateLimit:
         )
 
         assert allowed is True
-        assert remaining == 2
+        assert remaining == 1  # 5 - 3 - 1
 
 
 class TestRateLimiterClass:

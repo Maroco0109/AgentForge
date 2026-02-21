@@ -2,6 +2,7 @@
 
 import logging
 import time
+import uuid as uuid_mod
 
 from fastapi import Depends, HTTPException, Request, status
 from redis.asyncio import Redis
@@ -76,22 +77,22 @@ async def check_rate_limit(
     now = time.time()
     window_start = now - window_seconds
 
+    # Use unique member key to prevent collision on concurrent requests
+    member = f"{now}-{uuid_mod.uuid4().hex[:8]}"
+
     pipe = redis.pipeline()
     # Remove expired entries
     pipe.zremrangebyscore(key, 0, window_start)
-    # Add current request
-    pipe.zadd(key, {str(now): now})
-    # Count requests in window
+    # Count requests in window BEFORE adding
     pipe.zcard(key)
     # Set expiry on the key
     pipe.expire(key, window_seconds)
 
     results = await pipe.execute()
-    request_count = results[2]
+    request_count = results[1]
 
-    if request_count > limit:
-        # Over limit — calculate retry-after
-        # Get the oldest entry in the window
+    if request_count >= limit:
+        # Over limit — do NOT add to set; calculate retry-after
         oldest = await redis.zrange(key, 0, 0, withscores=True)
         if oldest:
             retry_after = int(oldest[0][1] + window_seconds - now) + 1
@@ -99,7 +100,11 @@ async def check_rate_limit(
             retry_after = window_seconds
         return False, 0, max(retry_after, 1)
 
-    remaining = limit - request_count
+    # Under limit — add current request
+    await redis.zadd(key, {member: now})
+    await redis.expire(key, window_seconds)
+
+    remaining = limit - request_count - 1
     return True, remaining, 0
 
 

@@ -1,5 +1,6 @@
 """Authentication routes."""
 
+import logging
 import re
 import uuid
 
@@ -20,6 +21,8 @@ from ..auth import (
     require_role,
     verify_password,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -190,9 +193,17 @@ async def get_me(current_user: User = Depends(get_current_user)):
 async def update_user_role(
     user_id: uuid.UUID,
     request: UpdateRoleRequest,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Update a user's role (admin only)."""
+    # Prevent admin from demoting themselves
+    if current_user.id == user_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot change your own role",
+        )
+
     result = await db.execute(select(User).where(User.id == user_id))
     target_user = result.scalar_one_or_none()
 
@@ -202,9 +213,18 @@ async def update_user_role(
             detail="User not found",
         )
 
+    old_role = target_user.role.value
     target_user.role = request.role
     await db.commit()
     await db.refresh(target_user)
+
+    logger.info(
+        "Role changed: admin=%s target=%s old_role=%s new_role=%s",
+        current_user.id,
+        user_id,
+        old_role,
+        request.role.value,
+    )
 
     return UserResponse(
         id=str(target_user.id),
