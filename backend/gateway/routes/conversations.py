@@ -2,13 +2,14 @@
 
 import uuid
 
-from backend.shared.database import get_db
-from backend.shared.models import Conversation
-from backend.shared.schemas import ConversationCreate, ConversationResponse, MessageResponse
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+
+from backend.shared.database import get_db
+from backend.shared.models import Conversation
+from backend.shared.schemas import ConversationCreate, ConversationResponse, MessageResponse
 
 router = APIRouter()
 

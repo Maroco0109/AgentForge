@@ -3,11 +3,12 @@
 from contextlib import asynccontextmanager
 from datetime import datetime
 
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
 from backend.shared.config import settings
 from backend.shared.database import init_db
 from backend.shared.schemas import HealthResponse
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 
 from .routes import chat, conversations
 
