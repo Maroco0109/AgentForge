@@ -18,6 +18,12 @@ class Settings(BaseSettings):
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
+    # LLM settings
+    OPENAI_API_KEY: str = ""
+    ANTHROPIC_API_KEY: str = ""
+    DEFAULT_LLM_PROVIDER: str = "openai"
+    DEFAULT_LLM_MODEL: str = "gpt-4o-mini"
+
     @model_validator(mode="after")
     def validate_secret_key(self):
         """Provide default SECRET_KEY in debug mode, require it in production."""
