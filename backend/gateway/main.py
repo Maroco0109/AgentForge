@@ -10,22 +10,25 @@ from backend.shared.config import settings
 from backend.shared.database import init_db
 from backend.shared.schemas import HealthResponse
 
+from .rate_limiter import close_redis, init_redis
 from .routes import auth, chat, conversations
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan handler."""
-    # Startup: Initialize database
+    # Startup: Initialize database and Redis
     await init_db()
+    await init_redis()
     yield
-    # Shutdown: cleanup if needed
+    # Shutdown: cleanup
+    await close_redis()
 
 
 # Create FastAPI application
 app = FastAPI(
     title="AgentForge API",
-    version="0.1.0",
+    version="0.2.0",
     description="Multi-agent discussion and pipeline API",
     lifespan=lifespan,
 )
@@ -50,6 +53,6 @@ async def health_check() -> HealthResponse:
     """Health check endpoint."""
     return HealthResponse(
         status="healthy",
-        version="0.1.0",
+        version="0.2.0",
         timestamp=datetime.now(timezone.utc),
     )

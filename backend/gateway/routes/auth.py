@@ -17,6 +17,7 @@ from ..auth import (
     decode_token,
     get_current_user,
     hash_password,
+    require_role,
     verify_password,
 )
 
@@ -72,6 +73,12 @@ class UserResponse(BaseModel):
     email: str
     display_name: str
     role: str
+
+
+class UpdateRoleRequest(BaseModel):
+    """Schema for updating a user's role (admin only)."""
+
+    role: UserRole
 
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
@@ -172,4 +179,36 @@ async def get_me(current_user: User = Depends(get_current_user)):
         email=current_user.email,
         display_name=current_user.display_name,
         role=current_user.role.value,
+    )
+
+
+@router.put(
+    "/users/{user_id}/role",
+    response_model=UserResponse,
+    dependencies=[Depends(require_role([UserRole.ADMIN]))],
+)
+async def update_user_role(
+    user_id: uuid.UUID,
+    request: UpdateRoleRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Update a user's role (admin only)."""
+    result = await db.execute(select(User).where(User.id == user_id))
+    target_user = result.scalar_one_or_none()
+
+    if not target_user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+
+    target_user.role = request.role
+    await db.commit()
+    await db.refresh(target_user)
+
+    return UserResponse(
+        id=str(target_user.id),
+        email=target_user.email,
+        display_name=target_user.display_name,
+        role=target_user.role.value,
     )
