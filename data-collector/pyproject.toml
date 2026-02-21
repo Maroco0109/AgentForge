@@ -1,0 +1,15 @@
+[project]
+name = "agentforge-data-collector"
+version = "0.1.0"
+description = "Data Collector microservice for AgentForge"
+requires-python = ">=3.11"
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
