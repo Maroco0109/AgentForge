@@ -107,20 +107,20 @@ class PipelineOrchestrator:
                 error=f"Pipeline timed out after {timeout} seconds",
             )
         except Exception as e:
-            logger.error(f"Pipeline '{design.name}' failed: {e}")
+            logger.error(f"Pipeline '{design.name}' failed: {e}", exc_info=True)
             if on_status:
                 await self._notify(
                     on_status,
                     {
                         "type": "pipeline_failed",
-                        "reason": str(e),
+                        "reason": "internal_error",
                     },
                 )
             return PipelineResult(
                 design_name=design.name,
                 status="failed",
                 total_duration=round(time.time() - start_time, 2),
-                error=str(e),
+                error="Pipeline execution failed due to an internal error",
             )
 
         # Build result from final state
@@ -179,8 +179,12 @@ class PipelineOrchestrator:
         errors = final_state.get("errors", [])
         failed_agents = [r for r in agent_results if r.status == "failed"]
 
-        if failed_agents and len(failed_agents) == len(agent_results):
+        if not agent_results:
             status = "failed"
+        elif failed_agents and len(failed_agents) == len(agent_results):
+            status = "failed"
+        elif failed_agents:
+            status = "partial"
         else:
             status = "completed"
 

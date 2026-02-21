@@ -58,6 +58,20 @@ class BaseAgentNode(ABC):
                 f"Agent '{self.name}': potential injection in design data "
                 f"({len(matches)} pattern(s))"
             )
+            result = AgentResult(
+                agent_name=self.name,
+                role=self.role,
+                content="",
+                duration_seconds=round(time.time() - start_time, 2),
+                status="failed",
+                error="Potential prompt injection detected in design data",
+            )
+            return {
+                "agent_results": [result.model_dump()],
+                "errors": [f"Agent '{self.name}': prompt injection detected"],
+                "current_step": state["current_step"] + 1,
+                "current_agent": self.name,
+            }
 
         for attempt in range(1, MAX_RETRIES + 1):
             try:
@@ -106,6 +120,3 @@ class BaseAgentNode(ABC):
                         "current_step": state["current_step"] + 1,
                         "current_agent": self.name,
                     }
-
-        # Should never reach here but satisfy type checker
-        return {"current_step": state["current_step"] + 1}

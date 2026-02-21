@@ -8,6 +8,7 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from backend.discussion.design_generator import DesignProposal
@@ -121,6 +122,6 @@ async def get_pipeline_result(
 
     result = run.get("result")
     if result is None:
-        raise HTTPException(status_code=202, detail="Pipeline still running")
+        return JSONResponse(status_code=202, content={"detail": "Pipeline still running"})
 
     return result
