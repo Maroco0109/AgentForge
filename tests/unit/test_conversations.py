@@ -20,14 +20,19 @@ async def test_create_conversation(client, test_user):
 
 
 @pytest.mark.asyncio
-async def test_create_conversation_auto_user(client):
-    """Test creating conversation with auto-generated user ID."""
+async def test_create_conversation_without_user_id(client):
+    """Test creating conversation without explicit user_id.
+
+    In Phase 1, user_id is auto-generated when not provided.
+    SQLite (test) doesn't enforce FK constraints, so this succeeds.
+    PostgreSQL (production) would reject with FK violation.
+    Phase 2 (auth) will always provide valid user_id from session.
+    """
     response = await client.post(
         "/api/v1/conversations",
         json={"title": "Auto User Conv"},
     )
-    # This may fail due to FK constraint - that's expected behavior
-    # In Phase 2 with auth, user_id will always come from session
+    # SQLite: 201 (no FK enforcement), PostgreSQL: 500 (FK violation)
     assert response.status_code in [201, 500]
 
 

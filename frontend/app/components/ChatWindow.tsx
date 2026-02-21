@@ -30,7 +30,8 @@ export default function ChatWindow() {
   }, [messages]);
 
   const connectWebSocket = () => {
-    const wsUrl = `ws://localhost:8000/api/v1/ws/chat/${conversationId}`;
+    const wsBase = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8000";
+    const wsUrl = `${wsBase}/api/v1/ws/chat/${conversationId}`;
     const ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {
@@ -49,17 +50,21 @@ export default function ChatWindow() {
     };
 
     ws.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      setIsTyping(false);
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: crypto.randomUUID(),
-          role: "assistant",
-          content: data.content || data.message || JSON.stringify(data),
-          timestamp: new Date(),
-        },
-      ]);
+      try {
+        const data = JSON.parse(event.data);
+        setIsTyping(false);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: crypto.randomUUID(),
+            role: "assistant",
+            content: data.content || data.message || JSON.stringify(data),
+            timestamp: new Date(),
+          },
+        ]);
+      } catch {
+        console.error("Failed to parse WebSocket message:", event.data);
+      }
     };
 
     ws.onerror = (error) => {
@@ -118,7 +123,7 @@ export default function ChatWindow() {
 
     wsRef.current.send(
       JSON.stringify({
-        message: inputValue,
+        content: inputValue,
         conversation_id: conversationId,
       })
     );
