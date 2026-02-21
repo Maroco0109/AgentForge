@@ -76,6 +76,10 @@ class IntentAnalyzer:
             # No LLM available - fall back to pattern matching
             logger.warning("No LLM available, using pattern matching fallback")
             return self._pattern_match_fallback(user_input)
+        except Exception as e:
+            # Catch any API errors (openai, anthropic, httpx, etc.)
+            logger.error(f"LLM API error during intent analysis: {e}")
+            return self._pattern_match_fallback(user_input)
 
     def _parse_response(self, content: str) -> IntentResult:
         """Parse LLM response into IntentResult."""

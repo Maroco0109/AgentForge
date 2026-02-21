@@ -62,7 +62,8 @@ class PromptIsolator:
     @staticmethod
     def wrap_user_input(user_input: str, context: str = "") -> str:
         """Wrap user input in XML isolation tags."""
-        sanitized = user_input.replace("</user_input>", "&lt;/user_input&gt;")
+        sanitized = user_input.replace("<user_input>", "&lt;user_input&gt;")
+        sanitized = sanitized.replace("</user_input>", "&lt;/user_input&gt;")
 
         prompt = ""
         if context:

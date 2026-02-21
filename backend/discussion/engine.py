@@ -31,7 +31,7 @@ class DiscussionEngine:
             }
 
         # Step 2: Analyze intent
-        intent: IntentResult = await self.intent_analyzer.analyze(user_input)
+        intent: IntentResult = await self.intent_analyzer.analyze(isolated_input)
 
         # Step 3: Build response
         if intent.needs_clarification:
