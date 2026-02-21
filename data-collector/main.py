@@ -3,12 +3,13 @@
 import logging
 import uuid
 from datetime import datetime, timezone
+from urllib.parse import urlparse
 
 from fastapi import FastAPI, HTTPException, status
 
 from .collectors.web_crawler import WebCrawler
 from .compliance.pii_detector import pii_detector  # noqa: F401
-from .compliance.rate_limiter import site_rate_limiter  # noqa: F401
+from .compliance.rate_limiter import site_rate_limiter
 from .compliance.robots_checker import robots_checker
 from .processing.anonymizer import anonymizer
 from .processing.chunker import text_chunker
@@ -152,6 +153,10 @@ async def run_collection(collection_id: str) -> CollectionStatusResponse:
         url = collection.get("url")
         if not url:
             raise HTTPException(status_code=400, detail="No URL provided")
+
+        # Respect rate limiting before crawling
+        domain = urlparse(url).netloc
+        await site_rate_limiter.wait(domain)
 
         # Crawl
         crawler = WebCrawler()
