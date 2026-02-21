@@ -1,9 +1,10 @@
 """Authentication routes."""
 
+import re
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -29,6 +30,18 @@ class RegisterRequest(BaseModel):
     email: EmailStr
     password: str
     display_name: str
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, v: str) -> str:
+        """Validate password complexity."""
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters long")
+        if not re.search(r"[A-Z]", v):
+            raise ValueError("Password must contain at least one uppercase letter")
+        if not re.search(r"\d", v):
+            raise ValueError("Password must contain at least one digit")
+        return v
 
 
 class LoginRequest(BaseModel):
@@ -112,7 +125,14 @@ async def refresh_token(request: RefreshRequest, db: AsyncSession = Depends(get_
         )
 
     user_id = payload.get("sub")
-    result = await db.execute(select(User).where(User.id == uuid.UUID(user_id)))
+    try:
+        user_uuid = uuid.UUID(user_id)
+    except (ValueError, TypeError):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token",
+        )
+    result = await db.execute(select(User).where(User.id == user_uuid))
     user = result.scalar_one_or_none()
 
     if not user:
