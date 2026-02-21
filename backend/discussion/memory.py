@@ -65,11 +65,12 @@ class DiscussionMemory(BaseModel):
         """Add a summary for the current round."""
         self.round_summaries.append(summary)
 
-    def get_context_for_llm(self) -> str:
+    def get_context_for_llm(self, max_chars: int = 4000) -> str:
         """Generate context string for LLM prompts.
 
         Provides a concise summary of the discussion state
         for inclusion in LLM system/user prompts.
+        Limits output to max_chars to prevent token overflow.
         """
         parts: list[str] = []
 
@@ -89,16 +90,24 @@ class DiscussionMemory(BaseModel):
                 parts.append(f"- {k}: {v}")
 
         if self.round_summaries:
+            # Only include last 3 round summaries to limit context size
+            recent = self.round_summaries[-3:]
+            offset = max(0, len(self.round_summaries) - 3)
             parts.append("\n## Previous Round Summaries")
-            for i, s in enumerate(self.round_summaries):
-                parts.append(f"Round {i + 1}: {s}")
+            for i, s in enumerate(recent):
+                parts.append(f"Round {offset + i + 1}: {s}")
 
         if self.resolved_questions:
             parts.append("\n## Resolved Questions")
             for rq in self.resolved_questions:
                 parts.append(f"- Q: {rq['question']} -> A: {rq['resolution']}")
 
-        return "\n".join(parts) if parts else "No prior discussion context."
+        context = "\n".join(parts) if parts else "No prior discussion context."
+
+        if len(context) > max_chars:
+            context = context[:max_chars] + "\n... (truncated)"
+
+        return context
 
     def to_dict(self) -> dict:
         """Serialize memory to dict."""

@@ -61,11 +61,11 @@ class DiscussionEngine:
             elif state == DiscussionState.PRESENT:
                 return await self._handle_present()
             elif state == DiscussionState.DEBATE:
-                return await self._handle_debate(user_input)
+                return await self._handle_debate(isolated_input)
             elif state == DiscussionState.REFINE:
-                return await self._handle_refine(user_input)
+                return await self._handle_refine(isolated_input)
             elif state == DiscussionState.CONFIRM:
-                return await self._handle_confirm(user_input)
+                return await self._handle_confirm(isolated_input)
             elif state == DiscussionState.PLAN:
                 return await self._handle_plan()
             else:
