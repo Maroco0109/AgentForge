@@ -20,6 +20,10 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+# Hard server-level cap matches uvicorn --ws-max-size (ADMIN tier max).
+# Per-role limits are enforced in the handler as defense-in-depth.
+WS_ABSOLUTE_MAX_SIZE = 1_048_576  # 1MB
+
 
 class ConnectionManager:
     """Manages WebSocket connections."""
@@ -125,11 +129,20 @@ async def websocket_chat_endpoint(websocket: WebSocket, conversation_id: uuid.UU
         await manager.connect(websocket, client_id)
 
         while True:
-            # Receive message from client
-            data = await websocket.receive_text()
+            # Receive raw ASGI message for early size check before processing.
+            # Server-level --ws-max-size caps frames at WS_ABSOLUTE_MAX_SIZE;
+            # this per-role check is defense-in-depth.
+            raw = await websocket.receive()
+            if raw["type"] == "websocket.disconnect":
+                break
 
-            # Check message size
-            if not is_unlimited(max_message_size) and len(data.encode("utf-8")) > max_message_size:
+            data = raw.get("text", "")
+            if not data and "bytes" in raw and raw["bytes"]:
+                data = raw["bytes"].decode("utf-8", errors="replace")
+
+            # Check message size against role limit
+            msg_byte_len = len(data.encode("utf-8"))
+            if not is_unlimited(max_message_size) and msg_byte_len > max_message_size:
                 await websocket.close(
                     code=1009,  # Message Too Big
                     reason=f"Message exceeds maximum size of {max_message_size} bytes",
