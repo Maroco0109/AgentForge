@@ -1,7 +1,5 @@
 """Tests for WebSocket chat endpoint."""
 
-
-
 from backend.gateway.routes.chat import ConnectionManager
 
 
