@@ -1,9 +1,11 @@
 """Pydantic schemas for Data Collector API."""
 
 import enum
+import ipaddress
 from datetime import datetime
+from urllib.parse import urlparse
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 
 class CollectionStatus(str, enum.Enum):
@@ -34,6 +36,45 @@ class CollectionCreateRequest(BaseModel):
     url: str | None = None
     source_type: SourceType = SourceType.WEB
     options: dict = {}
+
+    @field_validator("url")
+    @classmethod
+    def validate_url_not_private(cls, v: str | None) -> str | None:
+        """Prevent SSRF by blocking private/internal IPs."""
+        if v is None:
+            return v
+
+        try:
+            parsed = urlparse(v)
+            hostname = parsed.hostname
+
+            if not hostname:
+                return v
+
+            # Try to parse as IP address
+            try:
+                ip = ipaddress.ip_address(hostname)
+                # Block private, loopback, link-local, multicast
+                if (
+                    ip.is_private
+                    or ip.is_loopback
+                    or ip.is_link_local
+                    or ip.is_multicast
+                    or ip.is_reserved
+                ):
+                    raise ValueError(
+                        f"URL with private/internal IP address is not allowed: {hostname}"
+                    )
+            except ValueError as e:
+                # If it's a validation error from our check, re-raise
+                if "not allowed" in str(e):
+                    raise
+                # Otherwise it's not a valid IP, which is fine (it's a hostname)
+                pass
+
+            return v
+        except ValueError:
+            raise
 
 
 class ComplianceResult(BaseModel):
