@@ -83,7 +83,7 @@ class APIKeyResponse(BaseModel):
     last_used_at: datetime | None
     created_at: datetime
 
-class APIKeyMasked(BaseModel):
+class APIKeyResponse(BaseModel):
     """API 키 목록 조회 (마스킹)"""
     id: str
     name: str
@@ -421,7 +421,7 @@ def verify_api_key(plain_key: str, stored_hash: str) -> bool:
 
 ```python
 from fastapi import APIRouter, Depends, HTTPException
-from backend.shared.schemas import APIKeyCreate, APIKeyResponse, APIKeyMasked
+from backend.shared.schemas import APIKeyCreate, APIKeyResponse, APIKeyResponse
 from backend.gateway.auth import get_current_user
 
 router = APIRouter(prefix="/api-keys", tags=["API Keys"])
@@ -455,7 +455,7 @@ async def create_api_key(
         created_at=api_key.created_at,
     )
 
-@router.get("", response_model=list[APIKeyMasked])
+@router.get("", response_model=list[APIKeyResponse])
 async def list_api_keys(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -465,7 +465,7 @@ async def list_api_keys(
         select(APIKey).where(APIKey.user_id == current_user.id)
     )
     keys = result.scalars().all()
-    return [APIKeyMasked.from_orm(k) for k in keys]
+    return [APIKeyResponse.from_orm(k) for k in keys]
 
 @router.delete("/{key_id}", status_code=204)
 async def delete_api_key(
@@ -496,7 +496,7 @@ async def delete_api_key(
 | 파일 | 변경 사항 |
 |------|---------|
 | `backend/shared/models.py` | APIKey, UserDailyCost ORM 모델 추가 |
-| `backend/shared/schemas.py` | APIKeyCreate, APIKeyResponse, APIKeyMasked, UserUsageResponse 추가 |
+| `backend/shared/schemas.py` | APIKeyCreate, APIKeyResponse, APIKeyResponse, UserUsageResponse 추가 |
 | `backend/gateway/auth.py` | X-API-Key 헤더 처리, API Key 인증 로직 추가 |
 | `backend/gateway/rbac.py` | ROLE_DAILY_LIMITS 상수 추가 |
 | `backend/gateway/routes/chat.py` | 채팅 엔드포인트에 비용 검증 훅 추가 |

@@ -5,9 +5,9 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import Response
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from starlette.responses import Response
 
 from backend.gateway.auth import get_current_user
 from backend.shared.database import get_db
@@ -42,7 +42,9 @@ async def create_api_key(
     """
     # Check per-user API key count limit
     key_count = await db.scalar(
-        select(func.count()).select_from(APIKey).where(APIKey.user_id == current_user.id)
+        select(func.count())
+        .select_from(APIKey)
+        .where(APIKey.user_id == current_user.id, APIKey.is_active.is_(True))
     )
     if key_count >= _MAX_API_KEYS_PER_USER:
         raise HTTPException(

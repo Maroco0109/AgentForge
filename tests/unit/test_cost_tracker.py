@@ -17,8 +17,15 @@ from backend.shared.models import User, UserRole
 
 @pytest.fixture
 def mock_redis():
-    """Create mock Redis client."""
+    """Create mock Redis client with pipeline support."""
+    from unittest.mock import MagicMock
+
     redis = AsyncMock()
+    mock_pipe = MagicMock()
+    mock_pipe.incrbyfloat = MagicMock(return_value=mock_pipe)
+    mock_pipe.expire = MagicMock(return_value=mock_pipe)
+    mock_pipe.execute = AsyncMock(return_value=[0.75, True])
+    redis.pipeline = MagicMock(return_value=mock_pipe)
     return redis
 
 
@@ -149,9 +156,8 @@ class TestRecordCost:
 
     @pytest.mark.asyncio
     async def test_record_cost_increments(self, mock_redis):
-        """Test record_cost increments Redis counter with correct TTL."""
-        mock_redis.incrbyfloat.return_value = 0.75
-        mock_redis.expire.return_value = True
+        """Test record_cost increments Redis counter with correct TTL via pipeline."""
+        mock_pipe = mock_redis.pipeline.return_value
 
         with (
             patch("backend.gateway.cost_tracker.get_redis", return_value=mock_redis),
@@ -163,12 +169,14 @@ class TestRecordCost:
             result = await record_cost("user-1", 0.25)
 
         assert result == 0.75
-        mock_redis.incrbyfloat.assert_awaited_once()
-        args = mock_redis.incrbyfloat.call_args[0]
+        mock_redis.pipeline.assert_called_once()
+        mock_pipe.incrbyfloat.assert_called_once()
+        args = mock_pipe.incrbyfloat.call_args[0]
         assert args[1] == 0.25  # cost value
-        mock_redis.expire.assert_awaited_once()
-        expire_args = mock_redis.expire.call_args[0]
+        mock_pipe.expire.assert_called_once()
+        expire_args = mock_pipe.expire.call_args[0]
         assert expire_args[1] == 172800  # 48 hours TTL
+        mock_pipe.execute.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_record_cost_zero_skipped(self, mock_redis):
@@ -221,7 +229,9 @@ class TestRecordCost:
     @pytest.mark.asyncio
     async def test_record_cost_redis_error(self, mock_redis):
         """Test record_cost falls back gracefully on Redis error."""
-        mock_redis.incrbyfloat.side_effect = ConnectionError("Redis error")
+        mock_redis.pipeline.return_value.execute = AsyncMock(
+            side_effect=ConnectionError("Redis error")
+        )
         mock_persist = AsyncMock()
 
         with (
@@ -240,8 +250,6 @@ class TestPersistDailyCost:
     @pytest.mark.asyncio
     async def test_persist_called_on_record_cost(self, mock_redis):
         """Test _persist_daily_cost is called when recording cost."""
-        mock_redis.incrbyfloat.return_value = 0.75
-        mock_redis.expire.return_value = True
         mock_persist = AsyncMock()
 
         with (

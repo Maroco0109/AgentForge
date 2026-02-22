@@ -62,8 +62,12 @@ async def record_cost(user_id: str, cost: float) -> float:
 
     try:
         key = _today_key(user_id)
-        new_total = float(await redis.incrbyfloat(key, cost))
-        await redis.expire(key, 172800)  # 48 hours TTL
+        # Use pipeline for atomic incrbyfloat + expire
+        pipe = redis.pipeline()
+        pipe.incrbyfloat(key, cost)
+        pipe.expire(key, 172800)  # 48 hours TTL
+        results = await pipe.execute()
+        new_total = float(results[0])
     except Exception:
         logger.warning("Failed to record cost in Redis", exc_info=True)
         return cost
