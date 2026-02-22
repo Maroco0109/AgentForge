@@ -251,6 +251,6 @@ async def get_usage(current_user: User = Depends(get_current_user)):
     return UsageResponse(
         daily_cost=round(daily_cost, 4),
         daily_limit=float(limit),
-        remaining=round(float(limit) - daily_cost, 4) if not unlimited else -1,
+        remaining=round(max(0.0, float(limit) - daily_cost), 4) if not unlimited else -1,
         is_unlimited=unlimited,
     )

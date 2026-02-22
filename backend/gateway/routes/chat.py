@@ -10,7 +10,12 @@ from sqlalchemy import select
 
 from backend.discussion.design_generator import DesignProposal
 from backend.gateway.auth import decode_token
-from backend.gateway.cost_tracker import check_budget, record_cost
+from backend.gateway.cost_tracker import (
+    acquire_pipeline_lock,
+    check_budget,
+    record_cost,
+    release_pipeline_lock,
+)
 from backend.gateway.rate_limiter import (
     get_redis,
     ws_release_connection,
@@ -204,7 +209,27 @@ async def _process_discussion_response(
             )
             return
 
-        result = await orchestrator.execute(design, on_status=on_status)
+        # Per-user pipeline lock to prevent TOCTOU race condition
+        if not await acquire_pipeline_lock(user_id):
+            await manager.send_personal_message(
+                json.dumps(
+                    {
+                        "type": "error",
+                        "content": "파이프라인이 이미 실행 중입니다. 완료 후 다시 시도해주세요.",
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                    }
+                ),
+                client_id,
+            )
+            return
+
+        try:
+            result = await orchestrator.execute(design, on_status=on_status)
+        except Exception:
+            await release_pipeline_lock(user_id)
+            raise
+
+        await release_pipeline_lock(user_id)
 
         # Send final result
         await manager.send_personal_message(

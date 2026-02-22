@@ -206,7 +206,7 @@ class TestRecordCost:
 
     @pytest.mark.asyncio
     async def test_record_cost_redis_unavailable(self):
-        """Test record_cost still calls persist when Redis unavailable."""
+        """Test record_cost skips tracking when Redis unavailable."""
         mock_persist = AsyncMock()
 
         with (
@@ -216,7 +216,7 @@ class TestRecordCost:
             result = await record_cost("user-1", 0.5)
 
         assert result == 0.0  # No Redis, returns 0
-        mock_persist.assert_awaited_once()
+        mock_persist.assert_not_awaited()  # No persist without Redis
 
     @pytest.mark.asyncio
     async def test_record_cost_redis_error(self, mock_redis):
@@ -231,7 +231,7 @@ class TestRecordCost:
             result = await record_cost("user-1", 0.5)
 
         assert result == 0.5  # Falls back to cost value
-        mock_persist.assert_awaited_once()
+        mock_persist.assert_not_awaited()  # No persist on error
 
 
 class TestPersistDailyCost:

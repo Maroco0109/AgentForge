@@ -3,6 +3,8 @@
 import logging
 from datetime import datetime, timezone
 
+from sqlalchemy import select
+
 from backend.gateway.rate_limiter import get_redis
 from backend.gateway.rbac import get_permission, is_unlimited
 from backend.shared.database import AsyncSessionLocal
@@ -55,16 +57,16 @@ async def record_cost(user_id: str, cost: float) -> float:
         return await get_daily_cost(user_id)
 
     redis = get_redis()
-    new_total = 0.0
+    if redis is None:
+        return 0.0  # Skip tracking when Redis unavailable
 
-    if redis is not None:
-        try:
-            key = _today_key(user_id)
-            new_total = float(await redis.incrbyfloat(key, cost))
-            await redis.expire(key, 172800)  # 48 hours TTL
-        except Exception:
-            logger.warning("Failed to record cost in Redis", exc_info=True)
-            new_total = cost
+    try:
+        key = _today_key(user_id)
+        new_total = float(await redis.incrbyfloat(key, cost))
+        await redis.expire(key, 172800)  # 48 hours TTL
+    except Exception:
+        logger.warning("Failed to record cost in Redis", exc_info=True)
+        return cost
 
     # Persist to DB asynchronously (best-effort)
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -73,12 +75,39 @@ async def record_cost(user_id: str, cost: float) -> float:
     return new_total
 
 
+async def acquire_pipeline_lock(user_id: str) -> bool:
+    """Acquire per-user pipeline lock to prevent concurrent executions.
+
+    Prevents TOCTOU race between check_budget() and record_cost().
+    """
+    redis = get_redis()
+    if redis is None:
+        return True  # Allow if Redis unavailable
+    try:
+        key = f"pipeline_lock:{user_id}"
+        result = await redis.set(key, "1", nx=True, ex=300)  # 5min TTL
+        return result is not None
+    except Exception:
+        logger.warning("Failed to acquire pipeline lock", exc_info=True)
+        return True  # Allow on error (graceful degradation)
+
+
+async def release_pipeline_lock(user_id: str) -> None:
+    """Release per-user pipeline lock."""
+    redis = get_redis()
+    if redis is None:
+        return
+    try:
+        key = f"pipeline_lock:{user_id}"
+        await redis.delete(key)
+    except Exception:
+        logger.warning("Failed to release pipeline lock", exc_info=True)
+
+
 async def _persist_daily_cost(user_id: str, date: str, total: float) -> None:
     """Persist daily cost to PostgreSQL for audit."""
     try:
         async with AsyncSessionLocal() as session:
-            from sqlalchemy import select
-
             result = await session.execute(
                 select(UserDailyCost).where(
                     UserDailyCost.user_id == user_id,

@@ -5,7 +5,7 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.responses import Response
 
@@ -22,6 +22,9 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api-keys", tags=["api-keys"])
 
+# Maximum API keys per user
+_MAX_API_KEYS_PER_USER = 20
+
 
 @router.post(
     "",
@@ -37,6 +40,16 @@ async def create_api_key(
 
     Returns the plaintext key only once - it cannot be retrieved later.
     """
+    # Check per-user API key count limit
+    key_count = await db.scalar(
+        select(func.count()).select_from(APIKey).where(APIKey.user_id == current_user.id)
+    )
+    if key_count >= _MAX_API_KEYS_PER_USER:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"API key limit reached (max {_MAX_API_KEYS_PER_USER} per user)",
+        )
+
     # Generate raw key: sk- + 32 hex chars = 35 chars total
     raw_key = "sk-" + secrets.token_hex(16)
 
