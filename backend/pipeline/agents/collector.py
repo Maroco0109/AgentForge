@@ -128,10 +128,12 @@ class CollectorNode(BaseAgentNode):
                 collected_data = data_resp.json()
 
                 duration = round(time.time() - start_time, 2)
+                raw_data = str(collected_data.get("items", []))
+                truncated = len(raw_data) > 2000
                 content = (
                     f"Data collected from {source_url}.\n"
                     f"Items: {collected_data.get('total_items', 0)}\n"
-                    f"Data: {str(collected_data.get('items', []))[:2000]}"
+                    f"Data: {raw_data[:2000]}{'... (truncated)' if truncated else ''}"
                 )
 
                 result = AgentResult(

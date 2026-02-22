@@ -178,9 +178,12 @@ async def _process_discussion_response(
 
         async def on_status(status_data: dict) -> None:
             """Stream pipeline status to WebSocket."""
-            status_data["conversation_id"] = str(conversation_id)
-            status_data["timestamp"] = datetime.now(timezone.utc).isoformat()
-            await manager.send_personal_message(json.dumps(status_data), client_id)
+            try:
+                status_data["conversation_id"] = str(conversation_id)
+                status_data["timestamp"] = datetime.now(timezone.utc).isoformat()
+                await manager.send_personal_message(json.dumps(status_data), client_id)
+            except Exception:
+                logger.debug("Client disconnected during pipeline execution")
 
         result = await orchestrator.execute(design, on_status=on_status)
 
@@ -334,3 +337,4 @@ async def websocket_chat_endpoint(websocket: WebSocket, conversation_id: uuid.UU
     finally:
         manager.disconnect(client_id)
         await ws_release_connection(redis, user_id)
+        session_manager.remove(str(conversation_id))
