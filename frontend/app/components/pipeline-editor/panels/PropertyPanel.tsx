@@ -22,6 +22,13 @@ export default function PropertyPanel({
   const [role, setRole] = useState("");
   const [llmModel, setLlmModel] = useState("");
   const [description, setDescription] = useState("");
+  const [isCustomRole, setIsCustomRole] = useState(false);
+  const [customRoleName, setCustomRoleName] = useState("");
+  const [customPrompt, setCustomPrompt] = useState("");
+  const [temperature, setTemperature] = useState(0.7);
+  const [maxTokens, setMaxTokens] = useState(4096);
+  const [retryCount, setRetryCount] = useState(3);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   useEffect(() => {
     if (node) {
@@ -29,16 +36,42 @@ export default function PropertyPanel({
       setRole(node.data.role);
       setLlmModel(node.data.llmModel);
       setDescription(node.data.description);
+      setIsCustomRole(node.data.isCustomRole || false);
+      setCustomRoleName(node.data.isCustomRole ? node.data.role : "");
+      setCustomPrompt(node.data.customPrompt || "");
+      setTemperature(node.data.temperature ?? 0.7);
+      setMaxTokens(node.data.maxTokens ?? 4096);
+      setRetryCount(node.data.retryCount ?? 3);
+      // Auto-expand if advanced settings are configured
+      setShowAdvanced(
+        !!(
+          node.data.customPrompt ||
+          (node.data.temperature !== undefined && node.data.temperature !== 0.7) ||
+          (node.data.maxTokens !== undefined && node.data.maxTokens !== 4096) ||
+          (node.data.retryCount !== undefined && node.data.retryCount !== 3)
+        )
+      );
     }
   }, [node]);
 
   if (!node) return null;
 
   const handleApply = () => {
-    onUpdate(node.id, { name, role, llmModel, description });
+    const effectiveRole = isCustomRole ? customRoleName || "custom" : role;
+    onUpdate(node.id, {
+      name,
+      role: effectiveRole,
+      llmModel,
+      description,
+      isCustomRole,
+      customPrompt: customPrompt || undefined,
+      temperature,
+      maxTokens,
+      retryCount,
+    });
   };
 
-  const config = getRoleConfig(role);
+  const config = getRoleConfig(isCustomRole ? "" : role);
 
   return (
     <div className="absolute right-0 top-0 h-full w-72 bg-gray-900 border-l border-gray-700 shadow-xl z-20 flex flex-col">
@@ -72,20 +105,44 @@ export default function PropertyPanel({
           />
         </div>
 
+        {/* Custom Role Toggle */}
+        <div className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            id="customRoleToggle"
+            checked={isCustomRole}
+            onChange={(e) => setIsCustomRole(e.target.checked)}
+            className="rounded bg-gray-800 border-gray-600"
+          />
+          <label htmlFor="customRoleToggle" className="text-xs text-gray-400">
+            Custom Role
+          </label>
+        </div>
+
         {/* Role */}
         <div>
           <label className="block text-xs text-gray-400 mb-1">Role</label>
-          <select
-            value={role}
-            onChange={(e) => setRole(e.target.value)}
-            className="w-full bg-gray-800 text-gray-100 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary-500"
-          >
-            {AVAILABLE_ROLES.map((r) => (
-              <option key={r} value={r}>
-                {getRoleConfig(r).icon} {getRoleConfig(r).label}
-              </option>
-            ))}
-          </select>
+          {isCustomRole ? (
+            <input
+              type="text"
+              value={customRoleName}
+              onChange={(e) => setCustomRoleName(e.target.value)}
+              placeholder="e.g. summarizer"
+              className="w-full bg-gray-800 text-gray-100 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary-500"
+            />
+          ) : (
+            <select
+              value={role}
+              onChange={(e) => setRole(e.target.value)}
+              className="w-full bg-gray-800 text-gray-100 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary-500"
+            >
+              {AVAILABLE_ROLES.map((r) => (
+                <option key={r} value={r}>
+                  {getRoleConfig(r).icon} {getRoleConfig(r).label}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
 
         {/* LLM Model */}
@@ -114,6 +171,86 @@ export default function PropertyPanel({
             className="w-full bg-gray-800 text-gray-100 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary-500 resize-none"
           />
         </div>
+
+        {/* Advanced Settings Toggle */}
+        <button
+          onClick={() => setShowAdvanced(!showAdvanced)}
+          className="w-full text-left text-xs text-gray-400 hover:text-gray-200 flex items-center gap-1 py-1"
+        >
+          <span
+            className="transition-transform inline-block"
+            style={{ transform: showAdvanced ? "rotate(90deg)" : "rotate(0deg)" }}
+          >
+            ▶
+          </span>
+          Advanced Settings
+        </button>
+
+        {showAdvanced && (
+          <div className="space-y-3 pl-2 border-l border-gray-700">
+            {/* Custom Prompt */}
+            {isCustomRole && (
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">
+                  Custom System Prompt
+                </label>
+                <textarea
+                  value={customPrompt}
+                  onChange={(e) => setCustomPrompt(e.target.value)}
+                  rows={3}
+                  placeholder="Custom system prompt for this agent..."
+                  className="w-full bg-gray-800 text-gray-100 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary-500 resize-none"
+                />
+              </div>
+            )}
+
+            {/* Temperature */}
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">
+                Temperature: {temperature.toFixed(1)}
+              </label>
+              <input
+                type="range"
+                min="0"
+                max="2"
+                step="0.1"
+                value={temperature}
+                onChange={(e) => setTemperature(parseFloat(e.target.value))}
+                className="w-full accent-primary-500"
+              />
+              <div className="flex justify-between text-[10px] text-gray-500">
+                <span>Precise (0)</span>
+                <span>Creative (2)</span>
+              </div>
+            </div>
+
+            {/* Max Tokens */}
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">Max Tokens</label>
+              <input
+                type="number"
+                min="1"
+                max="16384"
+                value={maxTokens}
+                onChange={(e) => setMaxTokens(Math.max(1, Math.min(16384, parseInt(e.target.value) || 1)))}
+                className="w-full bg-gray-800 text-gray-100 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary-500"
+              />
+            </div>
+
+            {/* Retry Count */}
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">Retry Count</label>
+              <input
+                type="number"
+                min="0"
+                max="10"
+                value={retryCount}
+                onChange={(e) => setRetryCount(Math.max(0, Math.min(10, parseInt(e.target.value) || 0)))}
+                className="w-full bg-gray-800 text-gray-100 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary-500"
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Actions */}
