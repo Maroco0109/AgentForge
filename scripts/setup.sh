@@ -48,14 +48,11 @@ if grep -q "^OPENAI_API_KEY=sk-your-openai-api-key-here" "$DOCKER_DIR/.env" || \
     echo
     if [ -n "$api_key" ]; then
         if grep -q "^OPENAI_API_KEY=" "$DOCKER_DIR/.env"; then
-            python3 -c "
-import re, sys
-with open('$DOCKER_DIR/.env', 'r') as f:
-    content = f.read()
-content = re.sub(r'^OPENAI_API_KEY=.*', 'OPENAI_API_KEY=' + sys.argv[1], content, flags=re.MULTILINE)
-with open('$DOCKER_DIR/.env', 'w') as f:
-    f.write(content)
-" "$api_key"
+            # Use awk for safe replacement (no delimiter collision)
+            awk -v key="$api_key" '{
+                if ($0 ~ /^OPENAI_API_KEY=/) print "OPENAI_API_KEY=" key;
+                else print $0;
+            }' "$DOCKER_DIR/.env" > "$DOCKER_DIR/.env.tmp" && mv "$DOCKER_DIR/.env.tmp" "$DOCKER_DIR/.env"
         else
             echo "OPENAI_API_KEY=$api_key" >> "$DOCKER_DIR/.env"
         fi
