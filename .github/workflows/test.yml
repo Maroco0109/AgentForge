@@ -31,7 +31,7 @@ jobs:
           cache: 'pip'
           cache-dependency-path: backend/requirements.txt
       - run: pip install -r backend/requirements.txt && pip install pytest pytest-asyncio httpx aiosqlite
-      - run: cd backend && python -m pytest ../tests/ -v --tb=short
+      - run: cd backend && python -m pytest ../tests/ -v --tb=short -m "not llm_integration"
         env:
           DATABASE_URL: postgresql+asyncpg://test:test@localhost:5432/agentforge_test
           REDIS_URL: redis://localhost:6379
