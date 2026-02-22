@@ -91,7 +91,7 @@ export async function authenticatedContext(browser: Browser, token: string) {
 
   // 로컬스토리지에 토큰 저장 (프론트엔드가 사용하는 방식)
   await context.addInitScript((authToken) => {
-    localStorage.setItem('auth_token', authToken);
+    localStorage.setItem('access_token', authToken);
   }, token);
 
   return context;

@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { generateTestUser, registerUser, loginUser, createConversation, authenticatedContext } from './helpers';
 
-test.describe.skip('채팅 (Chat)', () => {
+test.describe('채팅 (Chat)', () => {
   test('대화 목록 페이지 렌더링', async ({ page, request }) => {
     const user = generateTestUser();
 
@@ -13,7 +13,7 @@ test.describe.skip('채팅 (Chat)', () => {
 
     // 로컬스토리지에 토큰 설정
     await page.evaluate((authToken) => {
-      localStorage.setItem('auth_token', authToken);
+      localStorage.setItem('access_token', authToken);
     }, token);
 
     await page.reload();
@@ -36,7 +36,7 @@ test.describe.skip('채팅 (Chat)', () => {
 
     // 로컬스토리지에 토큰 설정
     await page.evaluate((authToken) => {
-      localStorage.setItem('auth_token', authToken);
+      localStorage.setItem('access_token', authToken);
     }, token);
 
     await page.reload();
