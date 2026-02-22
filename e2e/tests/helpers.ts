@@ -64,8 +64,8 @@ export async function loginUser(
   user: Pick<TestUser, 'email' | 'password'>
 ): Promise<string> {
   const response = await request.post(`${API_BASE}/api/v1/auth/login`, {
-    form: {
-      username: user.email,
+    data: {
+      email: user.email,
       password: user.password,
     },
   });
