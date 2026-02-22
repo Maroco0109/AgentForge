@@ -59,7 +59,7 @@ export default function ChatWindow() {
   const [inputValue, setInputValue] = useState("");
   const [isConnected, setIsConnected] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
-  const [conversationId] = useState(() => crypto.randomUUID());
+  const [conversationId, setConversationId] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout>();
@@ -73,10 +73,61 @@ export default function ChatWindow() {
     scrollToBottom();
   }, [messages]);
 
-  const connectWebSocket = () => {
+  const getToken = (): string => {
+    return typeof window !== "undefined" ? localStorage.getItem("access_token") || "" : "";
+  };
+
+  const createConversation = async (): Promise<string | null> => {
+    const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+    const token = getToken();
+    if (!token) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          role: "system",
+          content: "Authentication required. Please log in first.",
+          timestamp: new Date(),
+        },
+      ]);
+      return null;
+    }
+
+    try {
+      const response = await fetch(`${apiBase}/api/v1/conversations`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ title: "New Conversation" }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to create conversation: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return data.id;
+    } catch (error) {
+      console.error("Failed to create conversation:", error);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          role: "system",
+          content: "Failed to start conversation. Please check your connection.",
+          timestamp: new Date(),
+        },
+      ]);
+      return null;
+    }
+  };
+
+  const connectWebSocket = (convId: string) => {
     const wsBase = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8000";
-    const token = typeof window !== "undefined" ? localStorage.getItem("access_token") || "" : "";
-    const wsUrl = `${wsBase}/api/v1/ws/chat/${conversationId}${token ? `?token=${token}` : ""}`;
+    const token = getToken();
+    const wsUrl = `${wsBase}/api/v1/ws/chat/${convId}${token ? `?token=${token}` : ""}`;
     const ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {
@@ -227,7 +278,7 @@ export default function ChatWindow() {
 
       reconnectTimeoutRef.current = setTimeout(() => {
         console.log(`Reconnecting (attempt ${reconnectAttemptsRef.current})...`);
-        connectWebSocket();
+        connectWebSocket(convId);
       }, backoffDelay);
     };
 
@@ -235,9 +286,19 @@ export default function ChatWindow() {
   };
 
   useEffect(() => {
-    connectWebSocket();
+    let cancelled = false;
+
+    const init = async () => {
+      const convId = await createConversation();
+      if (cancelled || !convId) return;
+      setConversationId(convId);
+      connectWebSocket(convId);
+    };
+
+    init();
 
     return () => {
+      cancelled = true;
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
       }
@@ -246,7 +307,7 @@ export default function ChatWindow() {
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conversationId]);
+  }, []);
 
   const handleSend = (e: React.FormEvent) => {
     e.preventDefault();

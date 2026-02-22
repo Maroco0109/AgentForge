@@ -22,6 +22,10 @@ from ..auth import (
     verify_password,
 )
 
+# Pre-computed dummy hash for constant-time user enumeration prevention.
+# Avoids recalculating bcrypt hash on every failed login attempt.
+_DUMMY_HASH = hash_password("dummy-constant-time-padding")
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -122,7 +126,7 @@ async def login(request: LoginRequest, db: AsyncSession = Depends(get_db)):
 
     if not user:
         # Constant-time: run dummy verify to prevent timing-based user enumeration
-        verify_password(request.password, hash_password("dummy"))
+        verify_password(request.password, _DUMMY_HASH)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
