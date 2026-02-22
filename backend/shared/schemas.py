@@ -1,11 +1,14 @@
 """Pydantic schemas for request/response validation."""
 
+import json
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 from .models import ConversationStatus, MessageRole, UserRole
+
+MAX_JSON_SIZE_BYTES = 512 * 1024  # 512KB
 
 
 # User schemas
@@ -140,6 +143,97 @@ class UsageResponse(BaseModel):
     daily_limit: float
     remaining: float
     is_unlimited: bool
+
+
+# Pipeline Template schemas
+def _check_json_size(v: dict, field_name: str) -> dict:
+    """Validate JSON dict does not exceed 512KB when serialized."""
+
+    size = len(json.dumps(v, default=str).encode())
+    if size > MAX_JSON_SIZE_BYTES:
+        max_kb = MAX_JSON_SIZE_BYTES // 1024
+        raise ValueError(f"{field_name} exceeds {max_kb}KB limit")
+    return v
+
+
+class TemplateCreate(BaseModel):
+    """Schema for creating a pipeline template."""
+
+    name: str = Field(min_length=1, max_length=255)
+    description: str = ""
+    graph_data: dict
+    design_data: dict
+
+    @field_validator("graph_data")
+    @classmethod
+    def validate_graph_data_size(cls, v: dict) -> dict:
+        """Ensure graph_data does not exceed size limit."""
+        return _check_json_size(v, "graph_data")
+
+    @field_validator("design_data")
+    @classmethod
+    def validate_design_data_size(cls, v: dict) -> dict:
+        """Ensure design_data does not exceed size limit."""
+        return _check_json_size(v, "design_data")
+
+
+class TemplateUpdate(BaseModel):
+    """Schema for updating a pipeline template."""
+
+    name: str | None = Field(default=None, min_length=1, max_length=255)
+    description: str | None = None
+    graph_data: dict | None = None
+    design_data: dict | None = None
+
+    @field_validator("graph_data")
+    @classmethod
+    def validate_graph_data_size(cls, v: dict | None) -> dict | None:
+        """Ensure graph_data does not exceed size limit."""
+        if v is not None:
+            return _check_json_size(v, "graph_data")
+        return v
+
+    @field_validator("design_data")
+    @classmethod
+    def validate_design_data_size(cls, v: dict | None) -> dict | None:
+        """Ensure design_data does not exceed size limit."""
+        if v is not None:
+            return _check_json_size(v, "design_data")
+        return v
+
+
+class TemplateResponse(BaseModel):
+    """Schema for pipeline template response."""
+
+    id: uuid.UUID
+    name: str
+    description: str | None
+    graph_data: dict
+    design_data: dict
+    is_public: bool
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        """Pydantic config."""
+
+        from_attributes = True
+
+
+class TemplateListResponse(BaseModel):
+    """Schema for pipeline template list response (summary)."""
+
+    id: uuid.UUID
+    name: str
+    description: str | None
+    is_public: bool
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        """Pydantic config."""
+
+        from_attributes = True
 
 
 # Health check schema

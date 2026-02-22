@@ -72,6 +72,9 @@ class User(Base):
     api_keys: Mapped[list["APIKey"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
+    templates: Mapped[list["PipelineTemplate"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
 
 
 class Conversation(Base):
@@ -141,6 +144,33 @@ class APIKey(Base):
 
     # Relationships
     user: Mapped["User"] = relationship(back_populates="api_keys")
+
+
+class PipelineTemplate(Base):
+    """Saved pipeline template for the visual editor."""
+
+    __tablename__ = "pipeline_templates"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    graph_data: Mapped[dict] = mapped_column(JSON, nullable=False)
+    design_data: Mapped[dict] = mapped_column(JSON, nullable=False)
+    is_public: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False
+    )  # Phase 8B: shared templates
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+    # Relationships
+    user: Mapped["User"] = relationship(back_populates="templates")
 
 
 class UserDailyCost(Base):

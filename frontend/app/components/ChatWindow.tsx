@@ -3,6 +3,12 @@
 import { useState, useEffect, useRef } from "react";
 import MessageBubble from "./MessageBubble";
 
+const OPEN_IN_EDITOR_MARKER = "__open_in_editor__";
+
+interface ChatWindowProps {
+  onOpenDesign?: (design: Record<string, unknown>) => void;
+}
+
 interface Message {
   id: string;
   role: "user" | "assistant" | "system";
@@ -54,7 +60,7 @@ function formatDiscussionMessage(data: Record<string, unknown>): string {
   return content;
 }
 
-export default function ChatWindow() {
+export default function ChatWindow({ onOpenDesign }: ChatWindowProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [isConnected, setIsConnected] = useState(false);
@@ -157,7 +163,6 @@ export default function ChatWindow() {
             break;
 
           case "clarification":
-          case "designs_presented":
           case "critique_complete":
           case "plan_generated": {
             setIsTyping(false);
@@ -171,6 +176,34 @@ export default function ChatWindow() {
                 timestamp: new Date(),
                 metadata: data,
               },
+            ]);
+            break;
+          }
+
+          case "designs_presented": {
+            setIsTyping(false);
+            const formatted = formatDiscussionMessage(data);
+            const designs = (data.designs as Array<Record<string, unknown>>) || [];
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: crypto.randomUUID(),
+                role: "assistant",
+                content: formatted,
+                timestamp: new Date(),
+                metadata: data,
+              },
+              ...(designs.length > 0
+                ? [
+                    {
+                      id: crypto.randomUUID(),
+                      role: "system" as const,
+                      content: OPEN_IN_EDITOR_MARKER,
+                      timestamp: new Date(),
+                      metadata: { designs },
+                    },
+                  ]
+                : []),
             ]);
             break;
           }
@@ -336,18 +369,38 @@ export default function ChatWindow() {
     setInputValue("");
   };
 
+  const renderMessage = (message: Message) => {
+    // Special "Open in Editor" button message
+    if (message.content === OPEN_IN_EDITOR_MARKER && message.metadata?.designs) {
+      const designs = message.metadata.designs as Array<Record<string, unknown>>;
+      const recommended = designs.find((d) => d.recommended) || designs[0];
+      return (
+        <div key={message.id} className="flex justify-center py-1">
+          <button
+            onClick={() => recommended && onOpenDesign?.(recommended)}
+            className="px-4 py-1.5 bg-primary-600/20 hover:bg-primary-600/40 text-primary-400 text-sm rounded-full border border-primary-600/30 transition-colors"
+          >
+            Open in Pipeline Editor
+          </button>
+        </div>
+      );
+    }
+
+    return (
+      <MessageBubble
+        key={message.id}
+        role={message.role}
+        content={message.content}
+        timestamp={message.timestamp}
+      />
+    );
+  };
+
   return (
     <div className="h-full flex flex-col">
       {/* Messages area */}
       <div className="flex-1 overflow-y-auto px-4 py-6 space-y-4">
-        {messages.map((message) => (
-          <MessageBubble
-            key={message.id}
-            role={message.role}
-            content={message.content}
-            timestamp={message.timestamp}
-          />
-        ))}
+        {messages.map(renderMessage)}
 
         {isTyping && (
           <div className="flex items-start space-x-2">
