@@ -41,7 +41,7 @@ async def create_template(
     db: AsyncSession = Depends(get_db),
 ) -> PipelineTemplate:
     """Create a new pipeline template."""
-    # Check per-user limit
+    # Check per-user limit (soft limit; concurrent requests may slightly exceed)
     count_result = await db.execute(
         select(func.count()).where(PipelineTemplate.user_id == current_user.id)
     )

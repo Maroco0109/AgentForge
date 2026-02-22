@@ -1,5 +1,6 @@
 """Pydantic schemas for request/response validation."""
 
+import json
 import uuid
 from datetime import datetime
 
@@ -147,7 +148,6 @@ class UsageResponse(BaseModel):
 # Pipeline Template schemas
 def _check_json_size(v: dict, field_name: str) -> dict:
     """Validate JSON dict does not exceed 512KB when serialized."""
-    import json
 
     size = len(json.dumps(v, default=str).encode())
     if size > MAX_JSON_SIZE_BYTES:

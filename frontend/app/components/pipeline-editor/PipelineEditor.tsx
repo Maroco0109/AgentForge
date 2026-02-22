@@ -128,7 +128,7 @@ export default function PipelineEditor({ onError, onEditorReady }: PipelineEdito
       }
 
       const graphData = template.graph_data;
-      if (graphData?.nodes && graphData?.edges) {
+      if (graphData?.nodes && Array.isArray(graphData.nodes) && graphData?.edges && Array.isArray(graphData.edges)) {
         setNodes(
           (graphData.nodes as Node<AgentNodeData>[]).map((n) => ({
             ...n,

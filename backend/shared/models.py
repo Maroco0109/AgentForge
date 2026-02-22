@@ -159,7 +159,9 @@ class PipelineTemplate(Base):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     graph_data: Mapped[dict] = mapped_column(JSON, nullable=False)
     design_data: Mapped[dict] = mapped_column(JSON, nullable=False)
-    is_public: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_public: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False
+    )  # Phase 8B: shared templates
     created_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), nullable=False
     )
