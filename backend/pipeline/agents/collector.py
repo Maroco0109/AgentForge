@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import time
 
 import httpx
@@ -63,10 +64,9 @@ class CollectorNode(BaseAgentNode):
         # Check agents for collector description with URLs
         for agent in design.get("agents", []):
             desc = agent.get("description", "")
-            if "http://" in desc or "https://" in desc:
-                for word in desc.split():
-                    if word.startswith("http://") or word.startswith("https://"):
-                        return word.rstrip(".,;)")
+            urls = re.findall(r"https?://\S+", desc)
+            if urls:
+                return urls[0].rstrip(".,;)")
 
         return None
 

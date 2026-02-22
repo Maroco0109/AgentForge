@@ -183,7 +183,7 @@ async def _process_discussion_response(
                 status_data["timestamp"] = datetime.now(timezone.utc).isoformat()
                 await manager.send_personal_message(json.dumps(status_data), client_id)
             except Exception:
-                logger.debug("Client disconnected during pipeline execution")
+                logger.debug("Client disconnected during pipeline execution", exc_info=True)
 
         result = await orchestrator.execute(design, on_status=on_status)
 
@@ -212,9 +212,10 @@ async def _process_discussion_response(
     else:
         # All other discussion responses: clarification, designs_presented,
         # critique_complete, security_warning, error
-        response["conversation_id"] = str(conversation_id)
-        response["timestamp"] = timestamp
-        await manager.send_personal_message(json.dumps(response), client_id)
+        payload = response.copy()
+        payload["conversation_id"] = str(conversation_id)
+        payload["timestamp"] = timestamp
+        await manager.send_personal_message(json.dumps(payload), client_id)
 
         # Save assistant response
         content = response.get("content", "")
@@ -236,6 +237,29 @@ async def websocket_chat_endpoint(websocket: WebSocket, conversation_id: uuid.UU
     """
     # Authenticate
     user_id, role = _authenticate_ws(websocket)
+
+    # Verify conversation ownership (IDOR prevention)
+    try:
+        async with AsyncSessionLocal() as session:
+            from sqlalchemy import select
+
+            from backend.shared.models import Conversation
+
+            result = await session.execute(
+                select(Conversation).where(
+                    Conversation.id == conversation_id,
+                    Conversation.user_id == user_id,
+                )
+            )
+            if result.scalar_one_or_none() is None:
+                raise WebSocketException(
+                    code=status.WS_1008_POLICY_VIOLATION,
+                    reason="Conversation not found or access denied",
+                )
+    except WebSocketException:
+        raise
+    except Exception as e:
+        logger.warning(f"Conversation ownership check failed: {e}")
 
     # Check connection limit
     max_connections = get_permission(role, "ws_max_connections")
