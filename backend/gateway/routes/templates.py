@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 MAX_TEMPLATES_PER_USER = 50
+MAX_SHARED_PAGE_SIZE = 50
 
 
 def _get_owned_template_query(template_id: uuid.UUID, user_id: uuid.UUID):
@@ -81,6 +82,21 @@ async def list_templates(
     return list(result.scalars().all())
 
 
+@router.get("/templates/shared", response_model=list[TemplateListResponse])
+async def list_shared_templates(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> list[PipelineTemplate]:
+    """List public templates from all users."""
+    result = await db.execute(
+        select(PipelineTemplate)
+        .where(PipelineTemplate.is_public.is_(True))
+        .order_by(PipelineTemplate.updated_at.desc())
+        .limit(MAX_SHARED_PAGE_SIZE)
+    )
+    return list(result.scalars().all())
+
+
 @router.get("/templates/{template_id}", response_model=TemplateResponse)
 async def get_template(
     template_id: uuid.UUID,
@@ -131,3 +147,44 @@ async def delete_template(
 
     await db.delete(template)
     return Response(status_code=204)
+
+
+@router.post("/templates/{template_id}/fork", response_model=TemplateResponse, status_code=201)
+async def fork_template(
+    template_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> PipelineTemplate:
+    """Fork a public template (creates a copy owned by current user)."""
+    # Look up the source template (must be public)
+    result = await db.execute(select(PipelineTemplate).where(PipelineTemplate.id == template_id))
+    source = result.scalar_one_or_none()
+    if not source:
+        raise HTTPException(status_code=404, detail="Template not found")
+    if not source.is_public:
+        raise HTTPException(status_code=404, detail="Template not found")
+
+    # Check per-user limit
+    count_result = await db.execute(
+        select(func.count()).where(PipelineTemplate.user_id == current_user.id)
+    )
+    count = count_result.scalar_one()
+    if count >= MAX_TEMPLATES_PER_USER:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Template limit reached ({MAX_TEMPLATES_PER_USER}). Delete some first.",
+        )
+
+    forked = PipelineTemplate(
+        id=uuid.uuid4(),
+        user_id=current_user.id,
+        name=f"{source.name} (fork)",
+        description=source.description,
+        graph_data=source.graph_data,
+        design_data=source.design_data,
+        is_public=False,
+    )
+    db.add(forked)
+    await db.flush()
+    await db.refresh(forked)
+    return forked

@@ -27,12 +27,18 @@ class BaseAgentNode(ABC):
         description: str,
         llm_model: str = "gpt-4o-mini",
         router: LLMRouter | None = None,
+        temperature: float = 0.7,
+        max_tokens: int = 4096,
+        retry_count: int = 3,
     ):
         self.name = name
         self.role = role
         self.description = description
         self.llm_model = llm_model
         self.router = router or llm_router
+        self.temperature = temperature
+        self.max_tokens = max_tokens
+        self.retry_count = retry_count
 
     @abstractmethod
     def build_messages(self, state: PipelineState) -> list[dict]:
@@ -74,14 +80,15 @@ class BaseAgentNode(ABC):
                 "current_agent": self.name,
             }
 
-        for attempt in range(1, MAX_RETRIES + 1):
+        retries = max(1, self.retry_count)
+        for attempt in range(1, retries + 1):
             try:
                 messages = self.build_messages(state)
                 response: LLMResponse = await self.router.generate(
                     messages=messages,
                     complexity=self.get_complexity(),
-                    max_tokens=4096,
-                    temperature=0.7,
+                    max_tokens=self.max_tokens,
+                    temperature=self.temperature,
                 )
 
                 duration = time.time() - start_time
@@ -104,8 +111,8 @@ class BaseAgentNode(ABC):
                 }
 
             except Exception as e:
-                logger.warning(f"Agent '{self.name}' attempt {attempt}/{MAX_RETRIES} failed: {e}")
-                if attempt < MAX_RETRIES:
+                logger.warning(f"Agent '{self.name}' attempt {attempt}/{retries} failed: {e}")
+                if attempt < retries:
                     # Exponential backoff before retry
                     await asyncio.sleep(2**attempt)
                 else:
@@ -120,7 +127,7 @@ class BaseAgentNode(ABC):
                     )
                     return {
                         "agent_results": [result.model_dump()],
-                        "errors": [f"Agent '{self.name}' failed after {MAX_RETRIES} retries: {e}"],
+                        "errors": [f"Agent '{self.name}' failed after {retries} retries: {e}"],
                         "current_step": state["current_step"] + 1,
                         "current_agent": self.name,
                     }

@@ -10,6 +10,12 @@ export interface AgentNodeData {
   llmModel: string;
   description: string;
   status: "idle" | "running" | "completed" | "failed";
+  // Phase 8B extended fields
+  customPrompt?: string;
+  temperature?: number;
+  maxTokens?: number;
+  retryCount?: number;
+  isCustomRole?: boolean;
 }
 
 function AgentNodeComponent({ data, selected }: NodeProps<AgentNodeData>) {
@@ -20,6 +26,12 @@ function AgentNodeComponent({ data, selected }: NodeProps<AgentNodeData>) {
     completed: "border-green-500",
     failed: "border-red-500",
   };
+
+  const hasAdvancedConfig =
+    data.customPrompt ||
+    (data.temperature !== undefined && data.temperature !== 0.7) ||
+    (data.maxTokens !== undefined && data.maxTokens !== 4096) ||
+    (data.retryCount !== undefined && data.retryCount !== 3);
 
   return (
     <div
@@ -40,6 +52,14 @@ function AgentNodeComponent({ data, selected }: NodeProps<AgentNodeData>) {
       >
         <span>{config.icon}</span>
         <span>{config.label}</span>
+        {data.isCustomRole && (
+          <span className="ml-auto text-[10px] opacity-75">custom</span>
+        )}
+        {hasAdvancedConfig && (
+          <span className="ml-auto text-[10px]" title="Advanced settings configured">
+            {"\u2699"}
+          </span>
+        )}
       </div>
 
       {/* Body */}

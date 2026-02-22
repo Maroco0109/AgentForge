@@ -6,36 +6,56 @@ import type { TemplateListItem } from "../hooks/useTemplates";
 interface TemplateListPanelProps {
   mode: "save" | "load";
   templates: TemplateListItem[];
+  sharedTemplates: TemplateListItem[];
   loading: boolean;
+  sharedLoading: boolean;
   onClose: () => void;
   onSave: (name: string, description: string) => void;
   onLoad: (id: string) => void;
   onDelete: (id: string) => void;
+  onFork: (id: string) => void;
+  onShare: (id: string, isPublic: boolean) => void;
   onRefresh: () => void;
+  onRefreshShared: () => void;
 }
 
 export default function TemplateListPanel({
   mode,
   templates,
+  sharedTemplates,
   loading,
+  sharedLoading,
   onClose,
   onSave,
   onLoad,
   onDelete,
+  onFork,
+  onShare,
   onRefresh,
+  onRefreshShared,
 }: TemplateListPanelProps) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [activeTab, setActiveTab] = useState<"my" | "shared">("my");
 
   useEffect(() => {
     onRefresh();
   }, [onRefresh]);
+
+  useEffect(() => {
+    if (activeTab === "shared") {
+      onRefreshShared();
+    }
+  }, [activeTab, onRefreshShared]);
 
   const handleSave = () => {
     if (!name.trim()) return;
     onSave(name.trim(), description.trim());
     onClose();
   };
+
+  const displayList = activeTab === "my" ? templates : sharedTemplates;
+  const isLoading = activeTab === "my" ? loading : sharedLoading;
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -90,35 +110,59 @@ export default function TemplateListPanel({
             </div>
           )}
 
+          {/* Tab bar (load mode only) */}
+          {mode === "load" && (
+            <div className="flex gap-1 mb-3 border-b border-gray-700">
+              <button
+                onClick={() => setActiveTab("my")}
+                className={`px-3 py-1.5 text-sm transition-colors ${
+                  activeTab === "my"
+                    ? "text-primary-400 border-b-2 border-primary-400"
+                    : "text-gray-400 hover:text-gray-200"
+                }`}
+              >
+                My Templates
+              </button>
+              <button
+                onClick={() => setActiveTab("shared")}
+                className={`px-3 py-1.5 text-sm transition-colors ${
+                  activeTab === "shared"
+                    ? "text-primary-400 border-b-2 border-primary-400"
+                    : "text-gray-400 hover:text-gray-200"
+                }`}
+              >
+                Shared Templates
+              </button>
+            </div>
+          )}
+
           {/* Template list */}
           <div>
-            {mode === "load" && (
-              <h3 className="text-sm text-gray-400 mb-2">Your Templates</h3>
-            )}
-            {mode === "save" && templates.length > 0 && (
-              <h3 className="text-sm text-gray-400 mb-2 pt-2 border-t border-gray-700">
-                Existing Templates
-              </h3>
-            )}
-
-            {loading ? (
+            {isLoading ? (
               <div className="text-center text-gray-500 py-6 text-sm">
                 Loading...
               </div>
-            ) : templates.length === 0 ? (
+            ) : displayList.length === 0 ? (
               <div className="text-center text-gray-500 py-6 text-sm">
-                No templates saved yet
+                {activeTab === "my"
+                  ? "No templates saved yet"
+                  : "No shared templates available"}
               </div>
             ) : (
               <div className="space-y-2">
-                {templates.map((t) => (
+                {displayList.map((t) => (
                   <div
                     key={t.id}
                     className="bg-gray-800 rounded px-3 py-2.5 flex items-center justify-between"
                   >
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm text-gray-100 font-medium truncate">
+                      <div className="text-sm text-gray-100 font-medium truncate flex items-center gap-1.5">
                         {t.name}
+                        {activeTab === "my" && t.is_public && (
+                          <span className="text-[10px] bg-green-900/50 text-green-400 px-1.5 py-0.5 rounded">
+                            Public
+                          </span>
+                        )}
                       </div>
                       {t.description && (
                         <div className="text-xs text-gray-400 truncate">
@@ -130,7 +174,7 @@ export default function TemplateListPanel({
                       </div>
                     </div>
                     <div className="flex gap-1.5 ml-2">
-                      {mode === "load" && (
+                      {activeTab === "my" && mode === "load" && (
                         <button
                           onClick={() => {
                             onLoad(t.id);
@@ -141,16 +185,35 @@ export default function TemplateListPanel({
                           Load
                         </button>
                       )}
-                      <button
-                        onClick={() => {
-                          if (window.confirm("Delete this template?")) {
-                            onDelete(t.id);
-                          }
-                        }}
-                        className="px-2.5 py-1 bg-gray-700 hover:bg-red-700 text-gray-300 hover:text-white text-xs rounded transition-colors"
-                      >
-                        Delete
-                      </button>
+                      {activeTab === "my" && (
+                        <button
+                          onClick={() => onShare(t.id, !t.is_public)}
+                          className="px-2.5 py-1 bg-gray-700 hover:bg-gray-600 text-gray-300 text-xs rounded transition-colors"
+                          title={t.is_public ? "Make private" : "Make public"}
+                        >
+                          {t.is_public ? "Unshare" : "Share"}
+                        </button>
+                      )}
+                      {activeTab === "shared" && (
+                        <button
+                          onClick={() => onFork(t.id)}
+                          className="px-2.5 py-1 bg-primary-600 hover:bg-primary-700 text-white text-xs rounded transition-colors"
+                        >
+                          Fork
+                        </button>
+                      )}
+                      {activeTab === "my" && (
+                        <button
+                          onClick={() => {
+                            if (window.confirm("Delete this template?")) {
+                              onDelete(t.id);
+                            }
+                          }}
+                          className="px-2.5 py-1 bg-gray-700 hover:bg-red-700 text-gray-300 hover:text-white text-xs rounded transition-colors"
+                        >
+                          Delete
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}

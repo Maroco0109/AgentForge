@@ -10,7 +10,7 @@ import ReactFlow, {
 } from "reactflow";
 import "reactflow/dist/style.css";
 
-import { nodeTypes } from "./nodes/AgentNodeTypes";
+import { nodeTypes, edgeTypes } from "./nodes/AgentNodeTypes";
 import { useFlowState } from "./hooks/useFlowState";
 import { usePipelineExecution } from "./hooks/usePipelineExecution";
 import { useTemplates } from "./hooks/useTemplates";
@@ -51,11 +51,16 @@ export default function PipelineEditor({ onError, onEditorReady }: PipelineEdito
 
   const {
     templates,
+    sharedTemplates,
     loading: templatesLoading,
+    sharedLoading: templatesSharedLoading,
     fetchTemplates,
+    fetchSharedTemplates,
     loadTemplate,
     saveTemplate,
     deleteTemplate,
+    forkTemplate,
+    shareTemplate,
   } = useTemplates();
 
   const nodeNameToIdMap = useCallback(() => {
@@ -107,6 +112,8 @@ export default function PipelineEditor({ onError, onEditorReady }: PipelineEdito
               id: e.id,
               source: e.source,
               target: e.target,
+              type: e.type,
+              data: e.data,
             })),
           },
           design_data: design as unknown as Record<string, unknown>,
@@ -141,6 +148,7 @@ export default function PipelineEditor({ onError, onEditorReady }: PipelineEdito
           name: string;
           description: string;
           agents: { name: string; role: string; llm_model: string; description: string }[];
+          edges?: { source: string; target: string; condition?: string }[];
         };
         const { nodes: newNodes, edges: newEdges } = designToFlow(design);
         setNodes(newNodes);
@@ -189,6 +197,30 @@ export default function PipelineEditor({ onError, onEditorReady }: PipelineEdito
     []
   );
 
+  const handleForkTemplate = useCallback(
+    async (id: string) => {
+      try {
+        await forkTemplate(id);
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : "Failed to fork template";
+        onError?.(msg);
+      }
+    },
+    [forkTemplate, onError]
+  );
+
+  const handleShareTemplate = useCallback(
+    async (id: string, isPublic: boolean) => {
+      try {
+        await shareTemplate(id, isPublic);
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : "Failed to update sharing";
+        onError?.(msg);
+      }
+    },
+    [shareTemplate, onError]
+  );
+
   return (
     <div className="h-full flex flex-col relative">
       <Toolbar
@@ -211,6 +243,7 @@ export default function PipelineEditor({ onError, onEditorReady }: PipelineEdito
           onNodeClick={onNodeClick}
           onPaneClick={onPaneClick}
           nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
           fitView
           className="bg-gray-950"
           defaultEdgeOptions={{ animated: true }}
@@ -239,12 +272,17 @@ export default function PipelineEditor({ onError, onEditorReady }: PipelineEdito
         <TemplateListPanel
           mode={templateMode}
           templates={templates}
+          sharedTemplates={sharedTemplates}
           loading={templatesLoading}
+          sharedLoading={templatesSharedLoading}
           onClose={() => setTemplateMode(null)}
           onSave={handleSaveTemplate}
           onLoad={handleLoadTemplate}
           onDelete={deleteTemplate}
+          onFork={handleForkTemplate}
+          onShare={handleShareTemplate}
           onRefresh={fetchTemplates}
+          onRefreshShared={fetchSharedTemplates}
         />
       )}
     </div>
