@@ -80,7 +80,7 @@ class BaseAgentNode(ABC):
                 "current_agent": self.name,
             }
 
-        retries = self.retry_count
+        retries = max(1, self.retry_count)
         for attempt in range(1, retries + 1):
             try:
                 messages = self.build_messages(state)

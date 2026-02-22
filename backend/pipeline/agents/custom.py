@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from backend.pipeline.agents.base import BaseAgentNode
 from backend.pipeline.state import PipelineState
+from backend.shared.security import input_sanitizer
 
 
 class CustomAgentNode(BaseAgentNode):
@@ -38,7 +39,12 @@ class CustomAgentNode(BaseAgentNode):
         design = state.get("design", {})
         previous_results = state.get("agent_results", [])
 
-        system_content = self.custom_prompt or (
+        prompt = self.custom_prompt
+        if prompt:
+            is_safe, _matches = input_sanitizer.check(prompt)
+            if not is_safe:
+                prompt = None  # Fall back to default if injection detected
+        system_content = prompt or (
             f"You are a {self.role} agent named '{self.name}'. Your task: {self.description}"
         )
 

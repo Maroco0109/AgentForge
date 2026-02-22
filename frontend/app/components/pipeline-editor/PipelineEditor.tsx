@@ -53,6 +53,7 @@ export default function PipelineEditor({ onError, onEditorReady }: PipelineEdito
     templates,
     sharedTemplates,
     loading: templatesLoading,
+    sharedLoading: templatesSharedLoading,
     fetchTemplates,
     fetchSharedTemplates,
     loadTemplate,
@@ -273,6 +274,7 @@ export default function PipelineEditor({ onError, onEditorReady }: PipelineEdito
           templates={templates}
           sharedTemplates={sharedTemplates}
           loading={templatesLoading}
+          sharedLoading={templatesSharedLoading}
           onClose={() => setTemplateMode(null)}
           onSave={handleSaveTemplate}
           onLoad={handleLoadTemplate}

@@ -8,6 +8,7 @@ interface TemplateListPanelProps {
   templates: TemplateListItem[];
   sharedTemplates: TemplateListItem[];
   loading: boolean;
+  sharedLoading: boolean;
   onClose: () => void;
   onSave: (name: string, description: string) => void;
   onLoad: (id: string) => void;
@@ -23,6 +24,7 @@ export default function TemplateListPanel({
   templates,
   sharedTemplates,
   loading,
+  sharedLoading,
   onClose,
   onSave,
   onLoad,
@@ -53,6 +55,7 @@ export default function TemplateListPanel({
   };
 
   const displayList = activeTab === "my" ? templates : sharedTemplates;
+  const isLoading = activeTab === "my" ? loading : sharedLoading;
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -135,7 +138,7 @@ export default function TemplateListPanel({
 
           {/* Template list */}
           <div>
-            {loading ? (
+            {isLoading ? (
               <div className="text-center text-gray-500 py-6 text-sm">
                 Loading...
               </div>

@@ -21,6 +21,7 @@ export function useTemplates() {
   const [templates, setTemplates] = useState<TemplateListItem[]>([]);
   const [sharedTemplates, setSharedTemplates] = useState<TemplateListItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [sharedLoading, setSharedLoading] = useState(false);
 
   const fetchTemplates = useCallback(async () => {
     setLoading(true);
@@ -35,14 +36,14 @@ export function useTemplates() {
   }, []);
 
   const fetchSharedTemplates = useCallback(async () => {
-    setLoading(true);
+    setSharedLoading(true);
     try {
       const data = await apiFetch<TemplateListItem[]>("/api/v1/templates/shared");
       setSharedTemplates(data);
     } catch (error) {
       console.error("Failed to fetch shared templates:", error);
     } finally {
-      setLoading(false);
+      setSharedLoading(false);
     }
   }, []);
 
@@ -122,6 +123,7 @@ export function useTemplates() {
     templates,
     sharedTemplates,
     loading,
+    sharedLoading,
     fetchTemplates,
     fetchSharedTemplates,
     loadTemplate,
