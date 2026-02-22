@@ -38,7 +38,6 @@ class ConversationCreate(BaseModel):
     """Schema for creating a conversation."""
 
     title: str
-    user_id: uuid.UUID | None = None  # Optional for now, will be from auth in Phase 2
 
 
 class ConversationResponse(BaseModel):

@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, WebSocketException, status
 
+from backend.discussion.design_generator import DesignProposal
 from backend.gateway.auth import decode_token
 from backend.gateway.rate_limiter import (
     get_redis,
@@ -14,7 +15,10 @@ from backend.gateway.rate_limiter import (
     ws_track_connection,
 )
 from backend.gateway.rbac import get_permission, is_unlimited
-from backend.shared.models import UserRole
+from backend.gateway.session_manager import session_manager
+from backend.pipeline.orchestrator import PipelineOrchestrator
+from backend.shared.database import AsyncSessionLocal
+from backend.shared.models import Message, MessageRole, UserRole
 
 logger = logging.getLogger(__name__)
 
@@ -101,6 +105,125 @@ def _authenticate_ws(websocket: WebSocket) -> tuple[str, UserRole]:
     return user_id, role
 
 
+async def _save_message(
+    conversation_id: uuid.UUID,
+    role: MessageRole,
+    content: str,
+    metadata: dict | None = None,
+) -> None:
+    """Save a message to the database."""
+    try:
+        async with AsyncSessionLocal() as session:
+            msg = Message(
+                conversation_id=conversation_id,
+                role=role,
+                content=content,
+                metadata_=metadata,
+            )
+            session.add(msg)
+            await session.commit()
+    except Exception as e:
+        logger.warning(f"Failed to save message: {e}")
+
+
+async def _process_discussion_response(
+    response: dict,
+    client_id: str,
+    conversation_id: uuid.UUID,
+) -> None:
+    """Route a DiscussionEngine response to the WebSocket client."""
+    resp_type = response.get("type", "unknown")
+    timestamp = datetime.now(timezone.utc).isoformat()
+
+    if resp_type == "plan_generated":
+        # Execute pipeline
+        selected_design_data = response.get("selected_design")
+        if not selected_design_data:
+            await manager.send_personal_message(
+                json.dumps(
+                    {
+                        "type": "error",
+                        "content": "설계안이 없습니다. 대화를 다시 시작해주세요.",
+                        "timestamp": timestamp,
+                    }
+                ),
+                client_id,
+            )
+            return
+
+        # Notify plan is ready
+        await manager.send_personal_message(
+            json.dumps(
+                {
+                    "type": "plan_generated",
+                    "content": response.get("content", "파이프라인 실행을 시작합니다."),
+                    "conversation_id": str(conversation_id),
+                    "timestamp": timestamp,
+                }
+            ),
+            client_id,
+        )
+
+        # Save assistant plan message
+        await _save_message(
+            conversation_id,
+            MessageRole.ASSISTANT,
+            response.get("content", "파이프라인 실행 계획이 준비되었습니다."),
+            {"type": resp_type, "discussion_summary": response.get("discussion_summary")},
+        )
+
+        # Build and execute pipeline
+        design = DesignProposal(**selected_design_data)
+        orchestrator = PipelineOrchestrator()
+
+        async def on_status(status_data: dict) -> None:
+            """Stream pipeline status to WebSocket."""
+            status_data["conversation_id"] = str(conversation_id)
+            status_data["timestamp"] = datetime.now(timezone.utc).isoformat()
+            await manager.send_personal_message(json.dumps(status_data), client_id)
+
+        result = await orchestrator.execute(design, on_status=on_status)
+
+        # Send final result
+        await manager.send_personal_message(
+            json.dumps(
+                {
+                    "type": "pipeline_result",
+                    "content": result.output or "파이프라인 실행이 완료되었습니다.",
+                    "result": result.model_dump(),
+                    "conversation_id": str(conversation_id),
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                }
+            ),
+            client_id,
+        )
+
+        # Save pipeline result as assistant message
+        await _save_message(
+            conversation_id,
+            MessageRole.ASSISTANT,
+            result.output or "파이프라인 실행이 완료되었습니다.",
+            {"type": "pipeline_result", "status": result.status, "total_cost": result.total_cost},
+        )
+
+    else:
+        # All other discussion responses: clarification, designs_presented,
+        # critique_complete, security_warning, error
+        response["conversation_id"] = str(conversation_id)
+        response["timestamp"] = timestamp
+        await manager.send_personal_message(json.dumps(response), client_id)
+
+        # Save assistant response
+        content = response.get("content", "")
+        if content and resp_type not in ("error", "security_warning"):
+            await _save_message(
+                conversation_id,
+                MessageRole.ASSISTANT,
+                content,
+                {"type": resp_type},
+            )
+
+
 @router.websocket("/ws/chat/{conversation_id}")
 async def websocket_chat_endpoint(websocket: WebSocket, conversation_id: uuid.UUID) -> None:
     """WebSocket endpoint for chat conversations.
@@ -166,20 +289,19 @@ async def websocket_chat_endpoint(websocket: WebSocket, conversation_id: uuid.UU
                     client_id,
                 )
 
-                # Placeholder: Echo back as assistant response
-                # In later phases, this will call the LLM/agent pipeline
-                assistant_response = f"Assistant echo: {user_message}"
-                await manager.send_personal_message(
-                    json.dumps(
-                        {
-                            "type": "assistant_message",
-                            "content": assistant_response,
-                            "conversation_id": str(conversation_id),
-                            "timestamp": datetime.now(timezone.utc).isoformat(),
-                        }
-                    ),
-                    client_id,
+                # Save user message to DB
+                await _save_message(
+                    conversation_id,
+                    MessageRole.USER,
+                    user_message,
                 )
+
+                # Process through DiscussionEngine
+                engine = session_manager.get_or_create(str(conversation_id))
+                response = await engine.process_message(user_message)
+
+                # Route response to client
+                await _process_discussion_response(response, client_id, conversation_id)
 
             except json.JSONDecodeError:
                 # Handle invalid JSON
@@ -188,6 +310,19 @@ async def websocket_chat_endpoint(websocket: WebSocket, conversation_id: uuid.UU
                         {
                             "type": "error",
                             "content": "Invalid message format",
+                            "timestamp": datetime.now(timezone.utc).isoformat(),
+                        }
+                    ),
+                    client_id,
+                )
+
+            except Exception as e:
+                logger.error(f"Error processing message: {e}", exc_info=True)
+                await manager.send_personal_message(
+                    json.dumps(
+                        {
+                            "type": "error",
+                            "content": "메시지 처리 중 오류가 발생했습니다.",
                             "timestamp": datetime.now(timezone.utc).isoformat(),
                         }
                     ),

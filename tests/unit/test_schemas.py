@@ -32,14 +32,12 @@ def test_conversation_create():
     """Test ConversationCreate schema."""
     conv = ConversationCreate(title="Test")
     assert conv.title == "Test"
-    assert conv.user_id is None
 
 
-def test_conversation_create_with_user():
-    """Test ConversationCreate with user_id."""
-    uid = uuid.uuid4()
-    conv = ConversationCreate(title="Test", user_id=uid)
-    assert conv.user_id == uid
+def test_conversation_create_title_only():
+    """Test ConversationCreate only has title field (user_id removed in Phase 7)."""
+    conv = ConversationCreate(title="My Conversation")
+    assert conv.title == "My Conversation"
 
 
 def test_health_response():
