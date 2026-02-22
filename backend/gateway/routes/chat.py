@@ -6,6 +6,7 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, WebSocketException, status
+from sqlalchemy import select
 
 from backend.discussion.design_generator import DesignProposal
 from backend.gateway.auth import decode_token
@@ -18,7 +19,7 @@ from backend.gateway.rbac import get_permission, is_unlimited
 from backend.gateway.session_manager import session_manager
 from backend.pipeline.orchestrator import PipelineOrchestrator
 from backend.shared.database import AsyncSessionLocal
-from backend.shared.models import Message, MessageRole, UserRole
+from backend.shared.models import Conversation, Message, MessageRole, UserRole
 
 logger = logging.getLogger(__name__)
 
@@ -241,10 +242,6 @@ async def websocket_chat_endpoint(websocket: WebSocket, conversation_id: uuid.UU
     # Verify conversation ownership (IDOR prevention)
     try:
         async with AsyncSessionLocal() as session:
-            from sqlalchemy import select
-
-            from backend.shared.models import Conversation
-
             result = await session.execute(
                 select(Conversation).where(
                     Conversation.id == conversation_id,
@@ -259,7 +256,11 @@ async def websocket_chat_endpoint(websocket: WebSocket, conversation_id: uuid.UU
     except WebSocketException:
         raise
     except Exception as e:
-        logger.warning(f"Conversation ownership check failed: {e}")
+        logger.error(f"Conversation ownership check failed: {e}")
+        raise WebSocketException(
+            code=status.WS_1008_POLICY_VIOLATION,
+            reason="Access verification failed",
+        )
 
     # Check connection limit
     max_connections = get_permission(role, "ws_max_connections")
@@ -361,4 +362,3 @@ async def websocket_chat_endpoint(websocket: WebSocket, conversation_id: uuid.UU
     finally:
         manager.disconnect(client_id)
         await ws_release_connection(redis, user_id)
-        session_manager.remove(str(conversation_id))
