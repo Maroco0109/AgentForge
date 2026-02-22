@@ -48,15 +48,13 @@ class PipelineStatusResponse(BaseModel):
     result: PipelineResult | None = None
 
 
-@router.post("/pipelines/execute", response_model=PipelineStatusResponse)
-async def execute_pipeline(
-    request: PipelineExecuteRequest,
-    current_user: User = Depends(get_current_user),
+async def _execute_pipeline_core(
+    design: DesignProposal,
+    current_user: User,
 ) -> PipelineStatusResponse:
-    """Execute a pipeline from a design proposal.
+    """Core pipeline execution logic shared by execute and execute-direct.
 
-    Requires authentication. Currently runs synchronously.
-    Phase 7 will add background execution.
+    Handles budget check, pipeline lock, orchestrator execution, and cost recording.
     """
     pipeline_id = str(uuid.uuid4())
     started_at = datetime.now(timezone.utc).isoformat()
@@ -68,7 +66,7 @@ async def execute_pipeline(
     _pipeline_runs[pipeline_id] = {
         "user_id": str(current_user.id),
         "status": "running",
-        "design_name": request.design.name,
+        "design_name": design.name,
         "started_at": started_at,
         "result": None,
     }
@@ -94,7 +92,7 @@ async def execute_pipeline(
     orchestrator = PipelineOrchestrator()
 
     try:
-        result = await orchestrator.execute(design=request.design)
+        result = await orchestrator.execute(design=design)
         _pipeline_runs[pipeline_id]["status"] = result.status
         _pipeline_runs[pipeline_id]["result"] = result
         # Record cost
@@ -104,7 +102,7 @@ async def execute_pipeline(
         logger.error(f"Pipeline execution failed: {e}", exc_info=True)
         _pipeline_runs[pipeline_id]["status"] = "failed"
         result = PipelineResult(
-            design_name=request.design.name,
+            design_name=design.name,
             status="failed",
             error="Pipeline execution failed. Please try again.",
         )
@@ -115,10 +113,35 @@ async def execute_pipeline(
     return PipelineStatusResponse(
         pipeline_id=pipeline_id,
         status=result.status,
-        design_name=request.design.name,
+        design_name=design.name,
         started_at=started_at,
         result=result,
     )
+
+
+@router.post("/pipelines/execute", response_model=PipelineStatusResponse)
+async def execute_pipeline(
+    request: PipelineExecuteRequest,
+    current_user: User = Depends(get_current_user),
+) -> PipelineStatusResponse:
+    """Execute a pipeline from a design proposal.
+
+    Requires authentication. Currently runs synchronously.
+    Phase 7 will add background execution.
+    """
+    return await _execute_pipeline_core(request.design, current_user)
+
+
+@router.post("/pipelines/execute-direct", response_model=PipelineStatusResponse)
+async def execute_direct(
+    request: PipelineExecuteRequest,
+    current_user: User = Depends(get_current_user),
+) -> PipelineStatusResponse:
+    """Execute a pipeline directly from the visual editor.
+
+    Bypasses the discussion engine. Same cost/lock checks apply.
+    """
+    return await _execute_pipeline_core(request.design, current_user)
 
 
 def _get_user_pipeline(pipeline_id: str, user_id: str) -> dict:

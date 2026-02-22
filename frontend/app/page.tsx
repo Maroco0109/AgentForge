@@ -1,4 +1,13 @@
+"use client";
+
+import dynamic from "next/dynamic";
 import ChatWindow from "./components/ChatWindow";
+import SplitView from "./components/SplitView";
+
+const PipelineEditor = dynamic(
+  () => import("./components/pipeline-editor/PipelineEditor"),
+  { ssr: false }
+);
 
 export default function Home() {
   return (
@@ -8,7 +17,10 @@ export default function Home() {
         <p className="text-sm text-gray-400 mt-1">User-prompt driven multi-agent platform</p>
       </header>
       <div className="flex-1 overflow-hidden">
-        <ChatWindow />
+        <SplitView
+          left={<ChatWindow />}
+          right={<PipelineEditor />}
+        />
       </div>
     </main>
   );

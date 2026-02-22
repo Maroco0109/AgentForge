@@ -74,3 +74,37 @@ body {
 .typing-dot:nth-child(3) {
   animation-delay: 0.4s;
 }
+
+/* React Flow overrides */
+.react-flow__node {
+  cursor: pointer;
+}
+
+.react-flow__edge-path {
+  stroke: #6b7280;
+  stroke-width: 2;
+}
+
+.react-flow__edge.animated .react-flow__edge-path {
+  stroke: #3b82f6;
+}
+
+.react-flow__connection-line {
+  stroke: #6b7280;
+  stroke-width: 2;
+  stroke-dasharray: 5;
+}
+
+/* Agent node running animation */
+@keyframes nodePulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(59, 130, 246, 0);
+  }
+}
+
+.agent-node-running {
+  animation: nodePulse 2s ease-in-out infinite;
+}

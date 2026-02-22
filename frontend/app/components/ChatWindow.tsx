@@ -54,6 +54,29 @@ function formatDiscussionMessage(data: Record<string, unknown>): string {
   return content;
 }
 
+function openDesignInEditor(designs: Array<Record<string, unknown>>) {
+  // Find the recommended design, or use the first one
+  const recommended = designs.find((d) => d.recommended) || designs[0];
+  if (!recommended) return;
+
+  // Find the pipeline editor container and call loadDesign
+  const editorEl = document.querySelector("[data-pipeline-editor]") as
+    | (HTMLDivElement & {
+        loadDesign?: (design: Record<string, unknown>) => void;
+      })
+    | null;
+
+  if (editorEl?.loadDesign) {
+    editorEl.loadDesign(recommended as Record<string, unknown>);
+
+    // Open the editor panel if closed
+    const toggleBtn = document.querySelector(
+      'button[title="Open Pipeline Editor"]'
+    ) as HTMLButtonElement | null;
+    if (toggleBtn) toggleBtn.click();
+  }
+}
+
 export default function ChatWindow() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
@@ -157,7 +180,6 @@ export default function ChatWindow() {
             break;
 
           case "clarification":
-          case "designs_presented":
           case "critique_complete":
           case "plan_generated": {
             setIsTyping(false);
@@ -171,6 +193,34 @@ export default function ChatWindow() {
                 timestamp: new Date(),
                 metadata: data,
               },
+            ]);
+            break;
+          }
+
+          case "designs_presented": {
+            setIsTyping(false);
+            const formatted = formatDiscussionMessage(data);
+            const designs = (data.designs as Array<Record<string, unknown>>) || [];
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: crypto.randomUUID(),
+                role: "assistant",
+                content: formatted,
+                timestamp: new Date(),
+                metadata: data,
+              },
+              ...(designs.length > 0
+                ? [
+                    {
+                      id: crypto.randomUUID(),
+                      role: "system" as const,
+                      content: "__open_in_editor__",
+                      timestamp: new Date(),
+                      metadata: { designs },
+                    },
+                  ]
+                : []),
             ]);
             break;
           }
@@ -336,18 +386,40 @@ export default function ChatWindow() {
     setInputValue("");
   };
 
+  const renderMessage = (message: Message) => {
+    // Special "Open in Editor" button message
+    if (message.content === "__open_in_editor__" && message.metadata?.designs) {
+      return (
+        <div key={message.id} className="flex justify-center py-1">
+          <button
+            onClick={() =>
+              openDesignInEditor(
+                message.metadata!.designs as Array<Record<string, unknown>>
+              )
+            }
+            className="px-4 py-1.5 bg-primary-600/20 hover:bg-primary-600/40 text-primary-400 text-sm rounded-full border border-primary-600/30 transition-colors"
+          >
+            Open in Pipeline Editor
+          </button>
+        </div>
+      );
+    }
+
+    return (
+      <MessageBubble
+        key={message.id}
+        role={message.role}
+        content={message.content}
+        timestamp={message.timestamp}
+      />
+    );
+  };
+
   return (
     <div className="h-full flex flex-col">
       {/* Messages area */}
       <div className="flex-1 overflow-y-auto px-4 py-6 space-y-4">
-        {messages.map((message) => (
-          <MessageBubble
-            key={message.id}
-            role={message.role}
-            content={message.content}
-            timestamp={message.timestamp}
-          />
-        ))}
+        {messages.map(renderMessage)}
 
         {isTyping && (
           <div className="flex items-start space-x-2">

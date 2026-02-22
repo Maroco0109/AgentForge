@@ -142,6 +142,59 @@ class UsageResponse(BaseModel):
     is_unlimited: bool
 
 
+# Pipeline Template schemas
+class TemplateCreate(BaseModel):
+    """Schema for creating a pipeline template."""
+
+    name: str = Field(min_length=1, max_length=255)
+    description: str = ""
+    graph_data: dict
+    design_data: dict
+
+
+class TemplateUpdate(BaseModel):
+    """Schema for updating a pipeline template."""
+
+    name: str | None = Field(default=None, min_length=1, max_length=255)
+    description: str | None = None
+    graph_data: dict | None = None
+    design_data: dict | None = None
+
+
+class TemplateResponse(BaseModel):
+    """Schema for pipeline template response."""
+
+    id: uuid.UUID
+    name: str
+    description: str | None
+    graph_data: dict
+    design_data: dict
+    is_public: bool
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        """Pydantic config."""
+
+        from_attributes = True
+
+
+class TemplateListResponse(BaseModel):
+    """Schema for pipeline template list response (summary)."""
+
+    id: uuid.UUID
+    name: str
+    description: str | None
+    is_public: bool
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        """Pydantic config."""
+
+        from_attributes = True
+
+
 # Health check schema
 class HealthResponse(BaseModel):
     """Schema for health check response."""
