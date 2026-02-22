@@ -45,8 +45,10 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
+    op.create_index("ix_pipeline_templates_user_id", "pipeline_templates", ["user_id"])
 
 
 def downgrade() -> None:
     """Drop pipeline_templates table."""
+    op.drop_index("ix_pipeline_templates_user_id", table_name="pipeline_templates")
     op.drop_table("pipeline_templates")
