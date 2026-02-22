@@ -43,22 +43,27 @@ if grep -q "^OPENAI_API_KEY=sk-your-openai-api-key-here" "$DOCKER_DIR/.env" || \
    grep -q "^# OPENAI_API_KEY=" "$DOCKER_DIR/.env" || \
    ! grep -q "^OPENAI_API_KEY=" "$DOCKER_DIR/.env"; then
     echo ""
-    warn "OPENAI_API_KEY가 설정되지 않았습니다."
-    read -rsp "OpenAI API 키를 입력하세요 (입력이 표시되지 않습니다, Enter로 건너뛰기): " api_key
-    echo
-    if [ -n "$api_key" ]; then
-        if grep -q "^OPENAI_API_KEY=" "$DOCKER_DIR/.env"; then
-            # Use awk for safe replacement (no delimiter collision)
-            awk -v key="$api_key" '{
-                if ($0 ~ /^OPENAI_API_KEY=/) print "OPENAI_API_KEY=" key;
-                else print $0;
-            }' "$DOCKER_DIR/.env" > "$DOCKER_DIR/.env.tmp" && mv "$DOCKER_DIR/.env.tmp" "$DOCKER_DIR/.env"
-        else
-            echo "OPENAI_API_KEY=$api_key" >> "$DOCKER_DIR/.env"
-        fi
-        success "OPENAI_API_KEY 설정 완료"
+    # Skip interactive prompt in CI/non-interactive environments
+    if [ -n "${CI:-}" ] || [ ! -t 0 ]; then
+        warn "비대화형 환경입니다. .env 파일에서 직접 OPENAI_API_KEY를 설정하세요."
     else
-        warn "API 키 없이 진행합니다. LLM 기능은 작동하지 않습니다."
+        warn "OPENAI_API_KEY가 설정되지 않았습니다."
+        read -rsp "OpenAI API 키를 입력하세요 (입력이 표시되지 않습니다, Enter로 건너뛰기): " api_key
+        echo
+        if [ -n "$api_key" ]; then
+            if grep -q "^OPENAI_API_KEY=" "$DOCKER_DIR/.env"; then
+                # Use awk for safe replacement (no delimiter collision)
+                awk -v key="$api_key" '{
+                    if ($0 ~ /^OPENAI_API_KEY=/) print "OPENAI_API_KEY=" key;
+                    else print $0;
+                }' "$DOCKER_DIR/.env" > "$DOCKER_DIR/.env.tmp" && mv "$DOCKER_DIR/.env.tmp" "$DOCKER_DIR/.env"
+            else
+                echo "OPENAI_API_KEY=$api_key" >> "$DOCKER_DIR/.env"
+            fi
+            success "OPENAI_API_KEY 설정 완료"
+        else
+            warn "API 키 없이 진행합니다. LLM 기능은 작동하지 않습니다."
+        fi
     fi
 fi
 

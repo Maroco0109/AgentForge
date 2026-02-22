@@ -1,4 +1,8 @@
-"""Integration tests for WebSocket chat and messaging."""
+"""Integration tests for WebSocket chat and messaging.
+
+Note: These tests use SQLite in-memory database for speed and isolation.
+PostgreSQL-specific features are tested via CI with real PostgreSQL.
+"""
 
 import uuid
 from unittest.mock import AsyncMock, patch

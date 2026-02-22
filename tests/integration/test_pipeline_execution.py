@@ -1,4 +1,8 @@
-"""Integration tests for pipeline execution."""
+"""Integration tests for pipeline execution.
+
+Note: Pipeline tests use mocked LLM responses for deterministic testing.
+Full end-to-end tests with real LLM calls require Docker environment.
+"""
 
 import asyncio
 from unittest.mock import AsyncMock, patch

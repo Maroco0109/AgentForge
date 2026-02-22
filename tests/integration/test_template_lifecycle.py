@@ -1,4 +1,8 @@
-"""Integration tests for template CRUD lifecycle."""
+"""Integration tests for template CRUD lifecycle.
+
+Note: These tests use SQLite in-memory database for speed and isolation.
+PostgreSQL-specific features (UUID, JSONB) are tested via CI with real PostgreSQL.
+"""
 
 import uuid
 
