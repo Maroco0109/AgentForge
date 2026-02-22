@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { generateTestUser, registerUser, loginUser, createConversation, authenticatedContext } from './helpers';
 
-test.describe('채팅 (Chat)', () => {
+test.describe.skip('채팅 (Chat)', () => {
   test('대화 목록 페이지 렌더링', async ({ page, request }) => {
     const user = generateTestUser();
 

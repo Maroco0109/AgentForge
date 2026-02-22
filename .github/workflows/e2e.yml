@@ -1,0 +1,110 @@
+name: E2E Tests
+
+on:
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'frontend/**'
+      - 'backend/**'
+      - 'data-collector/**'
+      - 'docker/**'
+      - 'e2e/**'
+  schedule:
+    # Weekdays at 03:00 UTC (nightly regression)
+    - cron: '0 3 * * 1-5'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: e2e/package-lock.json
+
+      - name: Install E2E dependencies
+        run: cd e2e && npm ci
+
+      - name: Install Playwright browsers
+        run: cd e2e && npx playwright install chromium --with-deps
+
+      - name: Start services with Docker Compose
+        run: cd docker && docker compose up -d --build
+
+      - name: Wait for services
+        run: |
+          echo "Waiting for backend..."
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:8000/api/v1/health > /dev/null 2>&1; then
+              echo "Backend is healthy!"
+              break
+            fi
+            if [ $i -eq 60 ]; then
+              echo "::error::Backend failed to start within 5 minutes"
+              echo "--- Docker container status ---"
+              docker ps -a
+              echo "--- Backend logs ---"
+              cd docker && docker compose logs backend 2>&1 | tail -100
+              exit 1
+            fi
+            sleep 5
+          done
+
+          echo "Waiting for frontend..."
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:3000 > /dev/null 2>&1; then
+              echo "Frontend is healthy!"
+              break
+            fi
+            if [ $i -eq 60 ]; then
+              echo "::error::Frontend failed to start"
+              cd docker && docker compose logs frontend 2>&1 | tail -50
+              exit 1
+            fi
+            sleep 5
+          done
+
+          echo "Waiting for data-collector..."
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8001/api/v1/health > /dev/null 2>&1; then
+              echo "Data-collector is healthy!"
+              break
+            fi
+            if [ $i -eq 30 ]; then
+              echo "::warning::Data-collector not responding (non-blocking)"
+              break
+            fi
+            sleep 5
+          done
+
+      - name: Run Playwright tests
+        run: cd e2e && npx playwright test
+        env:
+          CI: true
+          BASE_URL: http://localhost:3000
+
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report-${{ github.run_id }}
+          path: e2e/playwright-report/
+          retention-days: 14
+
+      - name: Docker logs on failure
+        if: failure()
+        run: |
+          echo "--- All container logs ---"
+          cd docker && docker compose logs 2>&1 | tail -200
+
+      - name: Cleanup Docker
+        if: always()
+        run: cd docker && docker compose down -v --remove-orphans

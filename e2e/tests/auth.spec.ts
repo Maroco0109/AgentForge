@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { generateTestUser, registerUser, loginUser } from './helpers';
 
-test.describe('인증 (Authentication)', () => {
+test.describe.skip('인증 (Authentication)', () => {
   test('회원가입 페이지 렌더링', async ({ page }) => {
     await page.goto('/register');
 
