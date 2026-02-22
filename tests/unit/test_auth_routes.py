@@ -276,7 +276,7 @@ async def test_get_me_success(client, test_session):
 async def test_get_me_without_token(client):
     """Test /me endpoint without authentication token."""
     response = await client.get("/api/v1/auth/me")
-    assert response.status_code == 403  # FastAPI HTTPBearer returns 403
+    assert response.status_code == 401  # HTTPBearer(auto_error=False) + manual check
 
 
 @pytest.mark.asyncio

@@ -10,6 +10,7 @@ from sqlalchemy import select
 
 from backend.discussion.design_generator import DesignProposal
 from backend.gateway.auth import decode_token
+from backend.gateway.cost_tracker import check_budget, record_cost
 from backend.gateway.rate_limiter import (
     get_redis,
     ws_release_connection,
@@ -131,6 +132,8 @@ async def _process_discussion_response(
     response: dict,
     client_id: str,
     conversation_id: uuid.UUID,
+    user_id: str,
+    role: UserRole,
 ) -> None:
     """Route a DiscussionEngine response to the WebSocket client."""
     resp_type = response.get("type", "unknown")
@@ -186,6 +189,21 @@ async def _process_discussion_response(
             except Exception:
                 logger.debug("Client disconnected during pipeline execution", exc_info=True)
 
+        # Cost circuit breaker
+        allowed, current, limit = await check_budget(user_id, role)
+        if not allowed:
+            await manager.send_personal_message(
+                json.dumps(
+                    {
+                        "type": "error",
+                        "content": f"일일 비용 한도 초과: ${current:.2f}/${limit:.2f}",
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                    }
+                ),
+                client_id,
+            )
+            return
+
         result = await orchestrator.execute(design, on_status=on_status)
 
         # Send final result
@@ -209,6 +227,10 @@ async def _process_discussion_response(
             result.output or "파이프라인 실행이 완료되었습니다.",
             {"type": "pipeline_result", "status": result.status, "total_cost": result.total_cost},
         )
+
+        # Record cost
+        if result.total_cost:
+            await record_cost(user_id, result.total_cost)
 
     else:
         # All other discussion responses: clarification, designs_presented,
@@ -329,7 +351,9 @@ async def websocket_chat_endpoint(websocket: WebSocket, conversation_id: uuid.UU
                 response = await engine.process_message(user_message)
 
                 # Route response to client
-                await _process_discussion_response(response, client_id, conversation_id)
+                await _process_discussion_response(
+                    response, client_id, conversation_id, user_id, role
+                )
 
             except json.JSONDecodeError:
                 # Handle invalid JSON

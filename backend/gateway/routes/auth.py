@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.shared.database import get_db
 from backend.shared.models import User, UserRole
+from backend.shared.schemas import UsageResponse
 
 from ..auth import (
     create_access_token,
@@ -21,6 +22,8 @@ from ..auth import (
     require_role,
     verify_password,
 )
+from ..cost_tracker import get_daily_cost
+from ..rbac import get_permission, is_unlimited
 
 # Pre-computed dummy hash for constant-time user enumeration prevention.
 # Avoids recalculating bcrypt hash on every failed login attempt.
@@ -235,4 +238,19 @@ async def update_user_role(
         email=target_user.email,
         display_name=target_user.display_name,
         role=target_user.role.value,
+    )
+
+
+@router.get("/me/usage", response_model=UsageResponse)
+async def get_usage(current_user: User = Depends(get_current_user)):
+    """Get current user's daily usage and cost limits."""
+    daily_cost = await get_daily_cost(str(current_user.id))
+    limit = get_permission(current_user.role, "max_cost_per_day_usd")
+    unlimited = is_unlimited(limit)
+
+    return UsageResponse(
+        daily_cost=round(daily_cost, 4),
+        daily_limit=float(limit),
+        remaining=round(float(limit) - daily_cost, 4) if not unlimited else -1,
+        is_unlimited=unlimited,
     )

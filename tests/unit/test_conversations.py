@@ -32,12 +32,12 @@ async def test_create_conversation(client, test_user):
 
 @pytest.mark.asyncio
 async def test_create_conversation_no_auth(client):
-    """Test creating conversation without auth returns 403."""
+    """Test creating conversation without auth returns 401."""
     response = await client.post(
         "/api/v1/conversations",
         json={"title": "No Auth Conv"},
     )
-    assert response.status_code == 403
+    assert response.status_code == 401
 
 
 @pytest.mark.asyncio
@@ -68,9 +68,9 @@ async def test_list_conversations_filters_by_user(client, test_user):
 
 @pytest.mark.asyncio
 async def test_list_conversations_no_auth(client):
-    """Test listing conversations without auth returns 403."""
+    """Test listing conversations without auth returns 401."""
     response = await client.get("/api/v1/conversations")
-    assert response.status_code == 403
+    assert response.status_code == 401
 
 
 @pytest.mark.asyncio

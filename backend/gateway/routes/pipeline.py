@@ -13,6 +13,7 @@ from pydantic import BaseModel
 
 from backend.discussion.design_generator import DesignProposal
 from backend.gateway.auth import get_current_user
+from backend.gateway.cost_tracker import check_budget, record_cost
 from backend.pipeline.orchestrator import PipelineOrchestrator
 from backend.pipeline.result import PipelineResult
 from backend.shared.models import User
@@ -67,12 +68,24 @@ async def execute_pipeline(
         "result": None,
     }
 
+    # Cost circuit breaker: check budget before execution
+    allowed, current, limit = await check_budget(str(current_user.id), current_user.role)
+    if not allowed:
+        _pipeline_runs[pipeline_id]["status"] = "rejected"
+        raise HTTPException(
+            status_code=402,
+            detail=f"Daily cost limit exceeded: ${current:.2f}/${limit:.2f}",
+        )
+
     orchestrator = PipelineOrchestrator()
 
     try:
         result = await orchestrator.execute(design=request.design)
         _pipeline_runs[pipeline_id]["status"] = result.status
         _pipeline_runs[pipeline_id]["result"] = result
+        # Record cost
+        if result.total_cost:
+            await record_cost(str(current_user.id), result.total_cost)
     except Exception as e:
         logger.error(f"Pipeline execution failed: {e}", exc_info=True)
         _pipeline_runs[pipeline_id]["status"] = "failed"

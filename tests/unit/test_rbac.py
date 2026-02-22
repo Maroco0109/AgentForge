@@ -72,16 +72,17 @@ class TestRolePermissions:
             "max_requests_per_minute",
             "ws_max_message_size",
             "ws_max_connections",
+            "max_cost_per_day_usd",
         }
         for role in UserRole:
             assert set(ROLE_PERMISSIONS[role].keys()) == expected_keys
 
-    def test_all_permission_values_are_integers(self):
-        """Test that all permission values are integers."""
+    def test_all_permission_values_are_numeric(self):
+        """Test that all permission values are numeric (int or float)."""
         for role in UserRole:
             for key, value in ROLE_PERMISSIONS[role].items():
-                assert isinstance(value, int), (
-                    f"Non-integer permission: {role}.{key} = {value}"
+                assert isinstance(value, (int, float)), (
+                    f"Non-numeric permission: {role}.{key} = {value}"
                 )
 
 
@@ -375,7 +376,9 @@ class TestRequireRoleDependency:
             f"/api/v1/auth/users/{fake_user_id}/role",
             json={"role": "admin"},
         )
-        assert response.status_code == 403  # HTTPBearer returns 403 when no token
+        assert (
+            response.status_code == 401
+        )  # HTTPBearer(auto_error=False) + manual check
 
     @pytest.mark.asyncio
     async def test_update_nonexistent_user_role(self, client, test_session):

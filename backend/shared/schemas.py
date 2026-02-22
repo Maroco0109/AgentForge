@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 
 from .models import ConversationStatus, MessageRole, UserRole
 
@@ -101,6 +101,45 @@ class ChatMessage(BaseModel):
     content: str
     conversation_id: uuid.UUID | None = None
     timestamp: datetime | None = None
+
+
+# API Key schemas
+class APIKeyCreate(BaseModel):
+    """Schema for creating an API key."""
+
+    name: str = Field(min_length=1, max_length=100)
+
+
+class APIKeyResponse(BaseModel):
+    """Schema for API key response (masked)."""
+
+    id: uuid.UUID
+    name: str
+    key_prefix: str
+    is_active: bool
+    last_used_at: datetime | None
+    created_at: datetime
+
+    class Config:
+        """Pydantic config."""
+
+        from_attributes = True
+
+
+class APIKeyCreateResponse(APIKeyResponse):
+    """Schema for API key creation response (includes plaintext key once)."""
+
+    key: str
+
+
+# Usage schemas
+class UsageResponse(BaseModel):
+    """Schema for user daily usage response."""
+
+    daily_cost: float
+    daily_limit: float
+    remaining: float
+    is_unlimited: bool
 
 
 # Health check schema
