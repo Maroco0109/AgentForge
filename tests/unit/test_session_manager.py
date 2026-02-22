@@ -1,6 +1,5 @@
 """Tests for SessionManager."""
 
-
 from backend.gateway.session_manager import SessionManager
 
 

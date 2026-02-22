@@ -10,6 +10,12 @@ from sqlalchemy import select
 
 from backend.discussion.design_generator import DesignProposal
 from backend.gateway.auth import decode_token
+from backend.gateway.cost_tracker import (
+    acquire_pipeline_lock,
+    check_budget,
+    record_cost,
+    release_pipeline_lock,
+)
 from backend.gateway.rate_limiter import (
     get_redis,
     ws_release_connection,
@@ -131,6 +137,8 @@ async def _process_discussion_response(
     response: dict,
     client_id: str,
     conversation_id: uuid.UUID,
+    user_id: str,
+    role: UserRole,
 ) -> None:
     """Route a DiscussionEngine response to the WebSocket client."""
     resp_type = response.get("type", "unknown")
@@ -186,7 +194,43 @@ async def _process_discussion_response(
             except Exception:
                 logger.debug("Client disconnected during pipeline execution", exc_info=True)
 
-        result = await orchestrator.execute(design, on_status=on_status)
+        # Cost circuit breaker
+        allowed, current, limit = await check_budget(user_id, role)
+        if not allowed:
+            await manager.send_personal_message(
+                json.dumps(
+                    {
+                        "type": "error",
+                        "content": f"일일 비용 한도 초과: ${current:.2f}/${limit:.2f}",
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                    }
+                ),
+                client_id,
+            )
+            return
+
+        # Per-user pipeline lock to prevent TOCTOU race condition
+        if not await acquire_pipeline_lock(user_id):
+            await manager.send_personal_message(
+                json.dumps(
+                    {
+                        "type": "error",
+                        "content": "파이프라인이 이미 실행 중입니다. 완료 후 다시 시도해주세요.",
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                    }
+                ),
+                client_id,
+            )
+            return
+
+        try:
+            result = await orchestrator.execute(design, on_status=on_status)
+
+            # Record cost before releasing lock to prevent TOCTOU race
+            if result.total_cost:
+                await record_cost(user_id, result.total_cost)
+        finally:
+            await release_pipeline_lock(user_id)
 
         # Send final result
         await manager.send_personal_message(
@@ -329,7 +373,9 @@ async def websocket_chat_endpoint(websocket: WebSocket, conversation_id: uuid.UU
                 response = await engine.process_message(user_message)
 
                 # Route response to client
-                await _process_discussion_response(response, client_id, conversation_id)
+                await _process_discussion_response(
+                    response, client_id, conversation_id, user_id, role
+                )
 
             except json.JSONDecodeError:
                 # Handle invalid JSON
