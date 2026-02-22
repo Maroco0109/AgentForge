@@ -107,29 +107,31 @@ export default function TemplateListPanel({
             </div>
           )}
 
-          {/* Tab bar */}
-          <div className="flex gap-1 mb-3 border-b border-gray-700">
-            <button
-              onClick={() => setActiveTab("my")}
-              className={`px-3 py-1.5 text-sm transition-colors ${
-                activeTab === "my"
-                  ? "text-primary-400 border-b-2 border-primary-400"
-                  : "text-gray-400 hover:text-gray-200"
-              }`}
-            >
-              My Templates
-            </button>
-            <button
-              onClick={() => setActiveTab("shared")}
-              className={`px-3 py-1.5 text-sm transition-colors ${
-                activeTab === "shared"
-                  ? "text-primary-400 border-b-2 border-primary-400"
-                  : "text-gray-400 hover:text-gray-200"
-              }`}
-            >
-              Shared Templates
-            </button>
-          </div>
+          {/* Tab bar (load mode only) */}
+          {mode === "load" && (
+            <div className="flex gap-1 mb-3 border-b border-gray-700">
+              <button
+                onClick={() => setActiveTab("my")}
+                className={`px-3 py-1.5 text-sm transition-colors ${
+                  activeTab === "my"
+                    ? "text-primary-400 border-b-2 border-primary-400"
+                    : "text-gray-400 hover:text-gray-200"
+                }`}
+              >
+                My Templates
+              </button>
+              <button
+                onClick={() => setActiveTab("shared")}
+                className={`px-3 py-1.5 text-sm transition-colors ${
+                  activeTab === "shared"
+                    ? "text-primary-400 border-b-2 border-primary-400"
+                    : "text-gray-400 hover:text-gray-200"
+                }`}
+              >
+                Shared Templates
+              </button>
+            </div>
+          )}
 
           {/* Template list */}
           <div>

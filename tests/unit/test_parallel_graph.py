@@ -153,6 +153,22 @@ class TestParallelGraphBuild:
         graph = builder.build(design)
         assert graph is not None
 
+    def test_partial_cycle_raises(self):
+        """Partial cycle (A->B, B->C, C->B) is detected."""
+        design = ExtendedDesignProposal(
+            name="cycle",
+            description="partial cycle",
+            agents=[_make_agent("a"), _make_agent("b"), _make_agent("c")],
+            edges=[
+                EdgeSpec(source="a", target="b"),
+                EdgeSpec(source="b", target="c"),
+                EdgeSpec(source="c", target="b"),
+            ],
+        )
+        builder = PipelineGraphBuilder()
+        with pytest.raises(ValueError, match="Cycle detected"):
+            builder.build(design)
+
     def test_extended_params_passed(self):
         """Extended parameters (temperature, max_tokens, retry_count) are passed."""
         agent = ExtendedAgentSpec(

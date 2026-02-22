@@ -69,7 +69,8 @@ def parse_condition(condition_str: str) -> tuple[str, str, str]:
     if not match:
         raise ValueError(
             f"Invalid condition format: '{condition_str}'. "
-            "Expected 'field op value' (e.g. 'score > 0.8')"
+            "Expected 'field op value' (e.g. 'score > 0.8'). "
+            "Supported operators: >, <, >=, <=, =="
         )
     return match.group(1), match.group(2), match.group(3)
 
@@ -185,6 +186,9 @@ class PipelineGraphBuilder:
             targets_with_incoming.add(edge.target)
             sources.add(edge.source)
 
+        # DFS cycle detection
+        self._detect_cycles(node_names, outgoing)
+
         # Find entry nodes (no incoming edges)
         entry_nodes = [n for n in node_names if n not in targets_with_incoming]
         if not entry_nodes:
@@ -229,6 +233,28 @@ class PipelineGraphBuilder:
                 # Multiple unconditional edges -> fan-out (parallel)
                 targets = [e.target for e in unconditional_edges]
                 self._add_fan_out(graph, source, targets)
+
+    @staticmethod
+    def _detect_cycles(node_names: list[str], outgoing: dict[str, list]) -> None:
+        """DFS-based cycle detection. Raises ValueError if a cycle exists."""
+        WHITE, GRAY, BLACK = 0, 1, 2
+        color = {n: WHITE for n in node_names}
+
+        def _dfs(node: str) -> bool:
+            color[node] = GRAY
+            for edge in outgoing.get(node, []):
+                target = edge.target
+                if color.get(target) == GRAY:
+                    return True  # back edge = cycle
+                if color.get(target) == WHITE and _dfs(target):
+                    return True
+            color[node] = BLACK
+            return False
+
+        for node in node_names:
+            if color[node] == WHITE:
+                if _dfs(node):
+                    raise ValueError("Cycle detected in edge topology")
 
     def _add_fan_out(self, graph: StateGraph, source: str, targets: list[str]) -> None:
         """Add fan-out edges from source to multiple targets using Send()."""

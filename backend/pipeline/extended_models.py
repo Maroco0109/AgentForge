@@ -6,11 +6,13 @@ from pydantic import BaseModel, Field, field_validator
 
 from backend.discussion.design_generator import AgentSpec, DesignProposal
 
+MAX_CUSTOM_PROMPT_LENGTH = 4000
+
 
 class ExtendedAgentSpec(AgentSpec):
     """AgentSpec with advanced configuration options."""
 
-    custom_prompt: str | None = None
+    custom_prompt: str | None = Field(default=None, max_length=MAX_CUSTOM_PROMPT_LENGTH)
     temperature: float = 0.7
     max_tokens: int = 4096
     retry_count: int = 3
