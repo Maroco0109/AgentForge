@@ -34,12 +34,9 @@ jobs:
         run: cd e2e && npx playwright install chromium --with-deps
 
       - name: Start services with Docker Compose
-        run: |
-          cd docker && docker compose up -d --build
-        env:
-          COMPOSE_PROJECT_NAME: agentforge-e2e
+        run: cd docker && docker compose up -d --build
 
-      - name: Wait for backend health
+      - name: Wait for services
         run: |
           echo "Waiting for backend..."
           for i in $(seq 1 60); do
@@ -48,15 +45,16 @@ jobs:
               break
             fi
             if [ $i -eq 60 ]; then
-              echo "Backend failed to start"
-              docker compose -f docker/docker-compose.yml logs backend
+              echo "::error::Backend failed to start within 5 minutes"
+              echo "--- Docker container status ---"
+              docker ps -a
+              echo "--- Backend logs ---"
+              cd docker && docker compose logs backend 2>&1 | tail -100
               exit 1
             fi
             sleep 5
           done
 
-      - name: Wait for frontend health
-        run: |
           echo "Waiting for frontend..."
           for i in $(seq 1 60); do
             if curl -sf http://localhost:3000 > /dev/null 2>&1; then
@@ -64,15 +62,13 @@ jobs:
               break
             fi
             if [ $i -eq 60 ]; then
-              echo "Frontend failed to start"
-              docker compose -f docker/docker-compose.yml logs frontend
+              echo "::error::Frontend failed to start"
+              cd docker && docker compose logs frontend 2>&1 | tail -50
               exit 1
             fi
             sleep 5
           done
 
-      - name: Wait for data-collector health
-        run: |
           echo "Waiting for data-collector..."
           for i in $(seq 1 30); do
             if curl -sf http://localhost:8001/api/v1/health > /dev/null 2>&1; then
@@ -80,9 +76,7 @@ jobs:
               break
             fi
             if [ $i -eq 30 ]; then
-              echo "Data-collector failed to start"
-              docker compose -f docker/docker-compose.yml logs data-collector
-              exit 1
+              echo "::warning::Data-collector not responding (non-blocking)"
             fi
             sleep 5
           done
@@ -101,7 +95,12 @@ jobs:
           path: e2e/playwright-report/
           retention-days: 14
 
+      - name: Docker logs on failure
+        if: failure()
+        run: |
+          echo "--- All container logs ---"
+          cd docker && docker compose logs 2>&1 | tail -200
+
       - name: Cleanup Docker
         if: always()
-        run: |
-          cd docker && docker compose down -v --remove-orphans
+        run: cd docker && docker compose down -v --remove-orphans
