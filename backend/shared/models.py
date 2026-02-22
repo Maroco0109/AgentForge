@@ -4,7 +4,18 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import JSON, DateTime, Enum, ForeignKey, String, Text, Uuid, func
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    DateTime,
+    Enum,
+    Float,
+    ForeignKey,
+    String,
+    Text,
+    Uuid,
+    func,
+)
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -58,6 +69,9 @@ class User(Base):
     conversations: Mapped[list["Conversation"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
+    api_keys: Mapped[list["APIKey"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
 
 
 class Conversation(Base):
@@ -105,3 +119,41 @@ class Message(Base):
 
     # Relationships
     conversation: Mapped["Conversation"] = relationship(back_populates="messages")
+
+
+class APIKey(Base):
+    """API Key model for programmatic access."""
+
+    __tablename__ = "api_keys"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    key_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    key_prefix: Mapped[str] = mapped_column(String(11), nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), nullable=False
+    )
+
+    # Relationships
+    user: Mapped["User"] = relationship(back_populates="api_keys")
+
+
+class UserDailyCost(Base):
+    """Daily LLM cost tracking for audit/persistence."""
+
+    __tablename__ = "user_daily_costs"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    date: Mapped[str] = mapped_column(String(10), nullable=False)
+    total_cost: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now(), nullable=False
+    )
