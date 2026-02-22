@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any
 from backend.pipeline.graph_builder import PipelineGraphBuilder
 from backend.pipeline.result import AgentResult, PipelineResult
 from backend.pipeline.state import PipelineState
+from backend.shared.metrics import PIPELINE_DURATION_SECONDS, PIPELINE_EXECUTIONS_TOTAL
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -53,6 +54,7 @@ class PipelineOrchestrator:
         try:
             compiled_graph = self.builder.build(design)
         except ValueError as e:
+            PIPELINE_EXECUTIONS_TOTAL.labels(status="failed").inc()
             return PipelineResult(
                 design_name=design.name,
                 status="failed",
@@ -100,10 +102,13 @@ class PipelineOrchestrator:
                         "reason": "timeout",
                     },
                 )
+            duration = time.time() - start_time
+            PIPELINE_EXECUTIONS_TOTAL.labels(status="timeout").inc()
+            PIPELINE_DURATION_SECONDS.observe(duration)
             return PipelineResult(
                 design_name=design.name,
                 status="timeout",
-                total_duration=round(time.time() - start_time, 2),
+                total_duration=round(duration, 2),
                 error=f"Pipeline timed out after {timeout} seconds",
             )
         except Exception as e:
@@ -116,15 +121,24 @@ class PipelineOrchestrator:
                         "reason": "internal_error",
                     },
                 )
+            duration = time.time() - start_time
+            PIPELINE_EXECUTIONS_TOTAL.labels(status="failed").inc()
+            PIPELINE_DURATION_SECONDS.observe(duration)
             return PipelineResult(
                 design_name=design.name,
                 status="failed",
-                total_duration=round(time.time() - start_time, 2),
+                total_duration=round(duration, 2),
                 error="Pipeline execution failed due to an internal error",
             )
 
         # Build result from final state
-        return self._build_result(design.name, final_state, start_time)
+        result = self._build_result(design.name, final_state, start_time)
+
+        # Record metrics
+        PIPELINE_EXECUTIONS_TOTAL.labels(status=result.status).inc()
+        PIPELINE_DURATION_SECONDS.observe(result.total_duration)
+
+        return result
 
     async def _run_graph(
         self,
