@@ -19,3 +19,4 @@ tiktoken==0.8.0
 langgraph>=0.4.5
 langchain-core>=0.3.0
 typing-extensions>=4.12.0
+prometheus-client>=0.21.0

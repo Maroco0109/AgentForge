@@ -2,10 +2,17 @@
 
 import enum
 import logging
+import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
 from backend.shared.config import settings
+from backend.shared.metrics import (
+    LLM_COST_DOLLARS_TOTAL,
+    LLM_REQUEST_DURATION_SECONDS,
+    LLM_REQUESTS_TOTAL,
+    LLM_TOKENS_TOTAL,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -288,11 +295,38 @@ class LLMRouter:
 
         logger.info(f"LLM Router: {complexity.value} -> {provider.value}/{model_config.model_id}")
 
-        # Generate response
+        # Generate response with metrics
+        start = time.perf_counter()
         response = await client.generate(messages, model_config.model_id, max_tokens, temperature)
+        duration = time.perf_counter() - start
 
         # Calculate cost
         response.cost_estimate = self._calculate_cost(model_config, response.usage)
+
+        # Record metrics
+        LLM_REQUESTS_TOTAL.labels(
+            provider=provider.value,
+            model=model_config.model_id,
+            complexity=complexity.value,
+        ).inc()
+        LLM_REQUEST_DURATION_SECONDS.labels(
+            provider=provider.value,
+            model=model_config.model_id,
+        ).observe(duration)
+        LLM_TOKENS_TOTAL.labels(
+            provider=provider.value,
+            model=model_config.model_id,
+            type="input",
+        ).inc(response.usage.get("prompt_tokens", 0))
+        LLM_TOKENS_TOTAL.labels(
+            provider=provider.value,
+            model=model_config.model_id,
+            type="output",
+        ).inc(response.usage.get("completion_tokens", 0))
+        LLM_COST_DOLLARS_TOTAL.labels(
+            provider=provider.value,
+            model=model_config.model_id,
+        ).inc(response.cost_estimate)
 
         return response
 

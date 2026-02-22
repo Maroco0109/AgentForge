@@ -9,3 +9,4 @@ PyMuPDF==1.24.0
 pandas==2.2.0
 openpyxl==3.1.5
 urllib3==2.2.0
+prometheus-client>=0.21.0

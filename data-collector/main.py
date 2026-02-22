@@ -5,7 +5,8 @@ import uuid
 from datetime import datetime, timezone
 from urllib.parse import urlparse
 
-from fastapi import FastAPI, HTTPException, status
+from fastapi import FastAPI, HTTPException, Response, status
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 from .collectors.web_crawler import WebCrawler
 from .compliance.pii_detector import pii_detector  # noqa: F401
@@ -39,6 +40,15 @@ _collections: dict[str, dict] = {}
 @app.get("/api/v1/health")
 async def health():
     return {"status": "healthy", "service": "data-collector", "version": "0.1.0"}
+
+
+@app.get("/metrics", include_in_schema=False)
+async def metrics():
+    """Expose Prometheus metrics."""
+    return Response(
+        content=generate_latest(),
+        media_type=CONTENT_TYPE_LATEST,
+    )
 
 
 @app.post("/api/v1/collections", status_code=status.HTTP_201_CREATED)

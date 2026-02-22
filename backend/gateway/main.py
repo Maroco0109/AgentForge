@@ -8,10 +8,11 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from backend.shared.config import settings
 from backend.shared.database import init_db
+from backend.shared.middleware import PrometheusMiddleware
 from backend.shared.schemas import HealthResponse
 
 from .rate_limiter import close_redis, init_redis
-from .routes import api_keys, auth, chat, conversations, pipeline, templates
+from .routes import api_keys, auth, chat, conversations, metrics, pipeline, templates
 
 
 @asynccontextmanager
@@ -42,6 +43,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Prometheus metrics middleware
+app.add_middleware(PrometheusMiddleware)
+
 # Include routers
 app.include_router(auth.router, prefix="/api/v1", tags=["auth"])
 app.include_router(chat.router, prefix="/api/v1", tags=["chat"])
@@ -49,6 +53,7 @@ app.include_router(conversations.router, prefix="/api/v1", tags=["conversations"
 app.include_router(pipeline.router, prefix="/api/v1", tags=["pipelines"])
 app.include_router(api_keys.router, prefix="/api/v1", tags=["api-keys"])
 app.include_router(templates.router, prefix="/api/v1", tags=["templates"])
+app.include_router(metrics.router, tags=["metrics"])
 
 
 @app.get("/api/v1/health", response_model=HealthResponse)
