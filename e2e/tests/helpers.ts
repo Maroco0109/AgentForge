@@ -6,6 +6,7 @@ export interface TestUser {
   email: string;
   password: string;
   username: string;
+  display_name: string;
 }
 
 export interface AuthResponse {
@@ -30,6 +31,7 @@ export function generateTestUser(): TestUser {
     email: `test-${timestamp}-${random}@example.com`,
     password: 'TestPassword123!',
     username: `testuser-${timestamp}-${random}`,
+    display_name: `Test User ${timestamp}`,
   };
 }
 
@@ -44,7 +46,7 @@ export async function registerUser(
     data: {
       email: user.email,
       password: user.password,
-      username: user.username,
+      display_name: user.display_name,
     },
   });
 
