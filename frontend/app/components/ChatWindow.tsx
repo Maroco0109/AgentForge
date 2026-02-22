@@ -3,6 +3,12 @@
 import { useState, useEffect, useRef } from "react";
 import MessageBubble from "./MessageBubble";
 
+const OPEN_IN_EDITOR_MARKER = "__open_in_editor__";
+
+interface ChatWindowProps {
+  onOpenDesign?: (design: Record<string, unknown>) => void;
+}
+
 interface Message {
   id: string;
   role: "user" | "assistant" | "system";
@@ -54,30 +60,7 @@ function formatDiscussionMessage(data: Record<string, unknown>): string {
   return content;
 }
 
-function openDesignInEditor(designs: Array<Record<string, unknown>>) {
-  // Find the recommended design, or use the first one
-  const recommended = designs.find((d) => d.recommended) || designs[0];
-  if (!recommended) return;
-
-  // Find the pipeline editor container and call loadDesign
-  const editorEl = document.querySelector("[data-pipeline-editor]") as
-    | (HTMLDivElement & {
-        loadDesign?: (design: Record<string, unknown>) => void;
-      })
-    | null;
-
-  if (editorEl?.loadDesign) {
-    editorEl.loadDesign(recommended as Record<string, unknown>);
-
-    // Open the editor panel if closed
-    const toggleBtn = document.querySelector(
-      'button[title="Open Pipeline Editor"]'
-    ) as HTMLButtonElement | null;
-    if (toggleBtn) toggleBtn.click();
-  }
-}
-
-export default function ChatWindow() {
+export default function ChatWindow({ onOpenDesign }: ChatWindowProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [isConnected, setIsConnected] = useState(false);
@@ -215,7 +198,7 @@ export default function ChatWindow() {
                     {
                       id: crypto.randomUUID(),
                       role: "system" as const,
-                      content: "__open_in_editor__",
+                      content: OPEN_IN_EDITOR_MARKER,
                       timestamp: new Date(),
                       metadata: { designs },
                     },
@@ -388,15 +371,13 @@ export default function ChatWindow() {
 
   const renderMessage = (message: Message) => {
     // Special "Open in Editor" button message
-    if (message.content === "__open_in_editor__" && message.metadata?.designs) {
+    if (message.content === OPEN_IN_EDITOR_MARKER && message.metadata?.designs) {
+      const designs = message.metadata.designs as Array<Record<string, unknown>>;
+      const recommended = designs.find((d) => d.recommended) || designs[0];
       return (
         <div key={message.id} className="flex justify-center py-1">
           <button
-            onClick={() =>
-              openDesignInEditor(
-                message.metadata!.designs as Array<Record<string, unknown>>
-              )
-            }
+            onClick={() => recommended && onOpenDesign?.(recommended)}
             className="px-4 py-1.5 bg-primary-600/20 hover:bg-primary-600/40 text-primary-400 text-sm rounded-full border border-primary-600/30 transition-colors"
           >
             Open in Pipeline Editor

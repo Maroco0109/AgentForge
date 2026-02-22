@@ -140,6 +140,7 @@ async def execute_direct(
     """Execute a pipeline directly from the visual editor.
 
     Bypasses the discussion engine. Same cost/lock checks apply.
+    Future: may add editor-specific features (e.g., step-by-step execution).
     """
     return await _execute_pipeline_core(request.design, current_user)
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import ReactFlow, {
   Background,
   Controls,
@@ -24,9 +24,10 @@ import TemplateListPanel from "./panels/TemplateListPanel";
 
 interface PipelineEditorProps {
   onError?: (message: string) => void;
+  onEditorReady?: (loadDesign: (design: Record<string, unknown>) => void) => void;
 }
 
-export default function PipelineEditor({ onError }: PipelineEditorProps) {
+export default function PipelineEditor({ onError, onEditorReady }: PipelineEditorProps) {
   const {
     nodes,
     edges,
@@ -170,16 +171,12 @@ export default function PipelineEditor({ onError }: PipelineEditorProps) {
     setSelectedNodeId(null);
   }, [setSelectedNodeId]);
 
-  // Expose loadDesign via a data attribute on the container
-  const containerRef = useCallback(
-    (el: HTMLDivElement | null) => {
-      if (el) {
-        (el as HTMLDivElement & { loadDesign?: typeof loadDesign }).loadDesign =
-          loadDesign;
-      }
-    },
-    [loadDesign]
-  );
+  // Expose loadDesign to parent via callback
+  useEffect(() => {
+    onEditorReady?.((design: Record<string, unknown>) => {
+      loadDesign(design as Parameters<typeof loadDesign>[0]);
+    });
+  }, [loadDesign, onEditorReady]);
 
   const miniMapNodeColor = useMemo(
     () => (node: Node) => {
@@ -193,7 +190,7 @@ export default function PipelineEditor({ onError }: PipelineEditorProps) {
   );
 
   return (
-    <div ref={containerRef} className="h-full flex flex-col relative" data-pipeline-editor>
+    <div className="h-full flex flex-col relative">
       <Toolbar
         onAddNode={addNode}
         onRun={handleRun}

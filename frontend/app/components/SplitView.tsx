@@ -1,28 +1,28 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 interface SplitViewProps {
   left: React.ReactNode;
   right: React.ReactNode;
+  isEditorOpen: boolean;
+  onEditorToggle: (open: boolean) => void;
 }
 
 const MIN_PANEL_WIDTH = 300;
 const STORAGE_KEY = "agentforge-split-view";
 
-export default function SplitView({ left, right }: SplitViewProps) {
-  const [isEditorOpen, setIsEditorOpen] = useState(false);
+export default function SplitView({ left, right, isEditorOpen, onEditorToggle }: SplitViewProps) {
   const [splitRatio, setSplitRatio] = useState(0.5);
   const containerRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
 
-  // Restore state from localStorage
+  // Restore splitRatio from localStorage
   useEffect(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (typeof parsed.isOpen === "boolean") setIsEditorOpen(parsed.isOpen);
         if (typeof parsed.ratio === "number") setSplitRatio(parsed.ratio);
       }
     } catch {
@@ -30,17 +30,14 @@ export default function SplitView({ left, right }: SplitViewProps) {
     }
   }, []);
 
-  // Save state
+  // Save splitRatio
   useEffect(() => {
     try {
-      localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify({ isOpen: isEditorOpen, ratio: splitRatio })
-      );
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ ratio: splitRatio }));
     } catch {
       // Ignore storage errors
     }
-  }, [isEditorOpen, splitRatio]);
+  }, [splitRatio]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -107,7 +104,7 @@ export default function SplitView({ left, right }: SplitViewProps) {
 
       {/* Toggle button */}
       <button
-        onClick={() => setIsEditorOpen(!isEditorOpen)}
+        onClick={() => onEditorToggle(!isEditorOpen)}
         className="absolute top-2 right-2 z-30 px-2.5 py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs rounded border border-gray-600 transition-colors"
         title={isEditorOpen ? "Close Editor" : "Open Pipeline Editor"}
       >

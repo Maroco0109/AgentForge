@@ -57,8 +57,8 @@ export const AVAILABLE_ROLES = Object.keys(ROLE_CONFIGS);
 export const AVAILABLE_MODELS = [
   "gpt-4o",
   "gpt-4o-mini",
-  "claude-sonnet",
-  "claude-haiku",
+  "claude-sonnet-4-5",
+  "claude-haiku-4-5",
 ];
 
 export function getRoleConfig(role: string): RoleConfig {

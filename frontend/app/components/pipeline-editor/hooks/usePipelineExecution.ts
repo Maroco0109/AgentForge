@@ -52,6 +52,8 @@ export function usePipelineExecution(
     [setAllNodesStatus]
   );
 
+  // TODO: Wire attachWsListener to shared WebSocket in Phase 8B
+  // for real-time node status updates during chat-initiated pipeline runs.
   const attachWsListener = useCallback(
     (ws: WebSocket) => {
       // Remove previous listener if any

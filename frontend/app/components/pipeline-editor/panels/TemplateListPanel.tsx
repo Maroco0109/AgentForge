@@ -142,7 +142,11 @@ export default function TemplateListPanel({
                         </button>
                       )}
                       <button
-                        onClick={() => onDelete(t.id)}
+                        onClick={() => {
+                          if (window.confirm("Delete this template?")) {
+                            onDelete(t.id);
+                          }
+                        }}
                         className="px-2.5 py-1 bg-gray-700 hover:bg-red-700 text-gray-300 hover:text-white text-xs rounded transition-colors"
                       >
                         Delete

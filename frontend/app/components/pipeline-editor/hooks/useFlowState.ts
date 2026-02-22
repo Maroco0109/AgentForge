@@ -14,11 +14,8 @@ import {
 import type { AgentNodeData } from "../nodes/AgentNode";
 import { getRoleConfig } from "../utils/nodeDefaults";
 
-let nodeIdCounter = 0;
-
 function nextNodeId(): string {
-  nodeIdCounter += 1;
-  return `agent-${nodeIdCounter}`;
+  return `agent-${crypto.randomUUID().slice(0, 8)}`;
 }
 
 export function useFlowState() {
