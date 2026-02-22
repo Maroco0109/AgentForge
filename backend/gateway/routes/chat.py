@@ -225,11 +225,12 @@ async def _process_discussion_response(
 
         try:
             result = await orchestrator.execute(design, on_status=on_status)
-        except Exception:
-            await release_pipeline_lock(user_id)
-            raise
 
-        await release_pipeline_lock(user_id)
+            # Record cost before releasing lock to prevent TOCTOU race
+            if result.total_cost:
+                await record_cost(user_id, result.total_cost)
+        finally:
+            await release_pipeline_lock(user_id)
 
         # Send final result
         await manager.send_personal_message(
@@ -252,10 +253,6 @@ async def _process_discussion_response(
             result.output or "파이프라인 실행이 완료되었습니다.",
             {"type": "pipeline_result", "status": result.status, "total_cost": result.total_cost},
         )
-
-        # Record cost
-        if result.total_cost:
-            await record_cost(user_id, result.total_cost)
 
     else:
         # All other discussion responses: clarification, designs_presented,

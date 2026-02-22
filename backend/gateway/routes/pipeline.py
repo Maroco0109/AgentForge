@@ -77,7 +77,7 @@ async def execute_pipeline(
     user_id_str = str(current_user.id)
     allowed, current, limit = await check_budget(user_id_str, current_user.role)
     if not allowed:
-        _pipeline_runs[pipeline_id]["status"] = "rejected"
+        del _pipeline_runs[pipeline_id]
         raise HTTPException(
             status_code=402,
             detail=f"Daily cost limit exceeded: ${current:.2f}/${limit:.2f}",
@@ -85,7 +85,7 @@ async def execute_pipeline(
 
     # Per-user pipeline lock to prevent TOCTOU race condition
     if not await acquire_pipeline_lock(user_id_str):
-        _pipeline_runs[pipeline_id]["status"] = "rejected"
+        del _pipeline_runs[pipeline_id]
         raise HTTPException(
             status_code=429,
             detail="A pipeline is already running. Please wait for it to complete.",

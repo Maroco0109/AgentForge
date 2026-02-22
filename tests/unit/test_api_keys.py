@@ -216,8 +216,8 @@ class TestAPIKeyCRUD:
             f"/api/v1/api-keys/{key_id}",
             headers=second_user_headers,
         )
-        assert delete_response.status_code == 403
-        assert "access denied" in delete_response.json()["detail"].lower()
+        assert delete_response.status_code == 404
+        assert "not found" in delete_response.json()["detail"].lower()
 
     @pytest.mark.asyncio
     async def test_create_api_key_name_validation(self, client, auth_headers):

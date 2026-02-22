@@ -72,7 +72,12 @@ async def create_api_key(
     await db.commit()
     await db.refresh(api_key)
 
-    logger.info(f"API key created: id={api_key.id}, user_id={current_user.id}, name={request.name}")
+    logger.info(
+        "API key created: id=%s, user_id=%s, name=%s",
+        api_key.id,
+        current_user.id,
+        request.name,
+    )
 
     # Return with plaintext key (one-time only)
     return APIKeyCreateResponse(
@@ -120,7 +125,9 @@ async def delete_api_key(
 
     Only the owner can delete their API keys.
     """
-    result = await db.execute(select(APIKey).where(APIKey.id == key_id))
+    result = await db.execute(
+        select(APIKey).where(APIKey.id == key_id, APIKey.user_id == current_user.id)
+    )
     api_key = result.scalar_one_or_none()
 
     if not api_key:
@@ -129,16 +136,9 @@ async def delete_api_key(
             detail="API key not found",
         )
 
-    # Check ownership
-    if api_key.user_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied",
-        )
-
     await db.delete(api_key)
     await db.commit()
 
-    logger.info(f"API key deleted: id={key_id}, user_id={current_user.id}")
+    logger.info("API key deleted: id=%s, user_id=%s", key_id, current_user.id)
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)
