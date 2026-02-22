@@ -57,7 +57,7 @@ function AgentNodeComponent({ data, selected }: NodeProps<AgentNodeData>) {
         )}
         {hasAdvancedConfig && (
           <span className="ml-auto text-[10px]" title="Advanced settings configured">
-            gear
+            {"\u2699"}
           </span>
         )}
       </div>

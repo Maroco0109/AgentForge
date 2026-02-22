@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import logging
+
 from backend.pipeline.agents.base import BaseAgentNode
 from backend.pipeline.state import PipelineState
 from backend.shared.security import input_sanitizer
+
+logger = logging.getLogger(__name__)
 
 
 class CustomAgentNode(BaseAgentNode):
@@ -43,7 +47,11 @@ class CustomAgentNode(BaseAgentNode):
         if prompt:
             is_safe, _matches = input_sanitizer.check(prompt)
             if not is_safe:
-                prompt = None  # Fall back to default if injection detected
+                logger.warning(
+                    "Injection detected in custom_prompt for '%s'",
+                    self.name,
+                )
+                prompt = None
         system_content = prompt or (
             f"You are a {self.role} agent named '{self.name}'. Your task: {self.description}"
         )
