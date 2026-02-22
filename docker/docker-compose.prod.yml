@@ -4,8 +4,8 @@ services:
       context: ../frontend
       dockerfile: ../docker/Dockerfile.frontend.prod
       args:
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
-        NEXT_PUBLIC_WS_URL: ${NEXT_PUBLIC_WS_URL:-ws://localhost:8000}
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:?NEXT_PUBLIC_API_URL is required}
+        NEXT_PUBLIC_WS_URL: ${NEXT_PUBLIC_WS_URL:?NEXT_PUBLIC_WS_URL is required}
     ports:
       - "3000:3000"
     environment:
@@ -123,11 +123,17 @@ services:
 
   redis:
     image: redis:7-alpine
-    command: redis-server --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD is required} --maxmemory 256mb --maxmemory-policy allkeys-lru
+    command: >-
+      sh -c 'echo "requirepass $$REDIS_PASSWORD" > /tmp/redis.conf &&
+      echo "maxmemory 256mb" >> /tmp/redis.conf &&
+      echo "maxmemory-policy allkeys-lru" >> /tmp/redis.conf &&
+      redis-server /tmp/redis.conf'
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      test: ["CMD-SHELL", "REDISCLI_AUTH=$$REDIS_PASSWORD redis-cli ping | grep -q PONG"]
       interval: 10s
       timeout: 5s
       retries: 5
