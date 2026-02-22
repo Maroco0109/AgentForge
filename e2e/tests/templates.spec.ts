@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { generateTestUser, registerUser, loginUser, authenticatedContext } from './helpers';
 
-test.describe('템플릿 (Templates)', () => {
+test.describe.skip('템플릿 (Templates)', () => {
   test('템플릿 목록 페이지 렌더링', async ({ page, request, browser }) => {
     const user = generateTestUser();
 

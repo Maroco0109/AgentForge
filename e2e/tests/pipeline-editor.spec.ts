@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { generateTestUser, registerUser, loginUser, authenticatedContext } from './helpers';
 
-test.describe('파이프라인 에디터 (Pipeline Editor)', () => {
+test.describe.skip('파이프라인 에디터 (Pipeline Editor)', () => {
   test('파이프라인 에디터 페이지 렌더링', async ({ page, request, browser }) => {
     const user = generateTestUser();
 

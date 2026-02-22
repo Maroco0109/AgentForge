@@ -77,6 +77,7 @@ jobs:
             fi
             if [ $i -eq 30 ]; then
               echo "::warning::Data-collector not responding (non-blocking)"
+              break
             fi
             sleep 5
           done
@@ -91,7 +92,7 @@ jobs:
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: playwright-report
+          name: playwright-report-${{ github.run_id }}
           path: e2e/playwright-report/
           retention-days: 14
 
