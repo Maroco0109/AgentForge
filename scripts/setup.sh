@@ -44,7 +44,8 @@ if grep -q "^OPENAI_API_KEY=sk-your-openai-api-key-here" "$DOCKER_DIR/.env" || \
    ! grep -q "^OPENAI_API_KEY=" "$DOCKER_DIR/.env"; then
     echo ""
     warn "OPENAI_API_KEY가 설정되지 않았습니다."
-    read -rp "OpenAI API 키를 입력하세요 (Enter로 건너뛰기): " api_key
+    read -rsp "OpenAI API 키를 입력하세요 (입력이 표시되지 않습니다, Enter로 건너뛰기): " api_key
+    echo
     if [ -n "$api_key" ]; then
         if grep -q "^OPENAI_API_KEY=" "$DOCKER_DIR/.env"; then
             python3 -c "
