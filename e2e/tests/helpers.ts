@@ -64,8 +64,8 @@ export async function loginUser(
   user: Pick<TestUser, 'email' | 'password'>
 ): Promise<string> {
   const response = await request.post(`${API_BASE}/api/v1/auth/login`, {
-    form: {
-      username: user.email,
+    data: {
+      email: user.email,
       password: user.password,
     },
   });
@@ -91,7 +91,7 @@ export async function authenticatedContext(browser: Browser, token: string) {
 
   // 로컬스토리지에 토큰 저장 (프론트엔드가 사용하는 방식)
   await context.addInitScript((authToken) => {
-    localStorage.setItem('auth_token', authToken);
+    localStorage.setItem('access_token', authToken);
   }, token);
 
   return context;

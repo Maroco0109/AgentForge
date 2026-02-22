@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { generateTestUser, registerUser, loginUser, authenticatedContext } from './helpers';
 
-test.describe.skip('템플릿 (Templates)', () => {
+test.describe('템플릿 (Templates)', () => {
   test('템플릿 목록 페이지 렌더링', async ({ page, request, browser }) => {
     const user = generateTestUser();
 
@@ -73,7 +73,7 @@ test.describe.skip('템플릿 (Templates)', () => {
     await context.close();
   });
 
-  test('템플릿 목록에서 템플릿 확인', async ({ page, request, browser }) => {
+  test.skip('템플릿 목록에서 템플릿 확인 (백엔드 API 필요)', async ({ page, request, browser }) => {
     const user = generateTestUser();
 
     // 사용자 등록 및 로그인
@@ -113,7 +113,7 @@ test.describe.skip('템플릿 (Templates)', () => {
     await context.close();
   });
 
-  test('템플릿 상세 보기', async ({ page, request, browser }) => {
+  test.skip('템플릿 상세 보기 (백엔드 API 필요)', async ({ page, request, browser }) => {
     const user = generateTestUser();
 
     // 사용자 등록 및 로그인
@@ -168,7 +168,7 @@ test.describe.skip('템플릿 (Templates)', () => {
     await context.close();
   });
 
-  test('템플릿 포크 (복제)', async ({ page, request, browser }) => {
+  test.skip('템플릿 포크 (백엔드 API 필요)', async ({ page, request, browser }) => {
     const user = generateTestUser();
 
     // 사용자 등록 및 로그인
@@ -233,7 +233,7 @@ test.describe.skip('템플릿 (Templates)', () => {
     await context.close();
   });
 
-  test('템플릿 검색', async ({ page, request, browser }) => {
+  test.skip('템플릿 검색 (백엔드 API 필요)', async ({ page, request, browser }) => {
     const user = generateTestUser();
 
     // 사용자 등록 및 로그인
