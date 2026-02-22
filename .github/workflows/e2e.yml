@@ -1,0 +1,107 @@
+name: E2E Tests
+
+on:
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'frontend/**'
+      - 'backend/**'
+      - 'data-collector/**'
+      - 'docker/**'
+      - 'e2e/**'
+  schedule:
+    # Weekdays at 03:00 UTC (nightly regression)
+    - cron: '0 3 * * 1-5'
+  workflow_dispatch:
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: e2e/package-lock.json
+
+      - name: Install E2E dependencies
+        run: cd e2e && npm ci
+
+      - name: Install Playwright browsers
+        run: cd e2e && npx playwright install chromium --with-deps
+
+      - name: Start services with Docker Compose
+        run: |
+          cd docker && docker compose up -d --build
+        env:
+          COMPOSE_PROJECT_NAME: agentforge-e2e
+
+      - name: Wait for backend health
+        run: |
+          echo "Waiting for backend..."
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:8000/api/v1/health > /dev/null 2>&1; then
+              echo "Backend is healthy!"
+              break
+            fi
+            if [ $i -eq 60 ]; then
+              echo "Backend failed to start"
+              docker compose -f docker/docker-compose.yml logs backend
+              exit 1
+            fi
+            sleep 5
+          done
+
+      - name: Wait for frontend health
+        run: |
+          echo "Waiting for frontend..."
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:3000 > /dev/null 2>&1; then
+              echo "Frontend is healthy!"
+              break
+            fi
+            if [ $i -eq 60 ]; then
+              echo "Frontend failed to start"
+              docker compose -f docker/docker-compose.yml logs frontend
+              exit 1
+            fi
+            sleep 5
+          done
+
+      - name: Wait for data-collector health
+        run: |
+          echo "Waiting for data-collector..."
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8001/api/v1/health > /dev/null 2>&1; then
+              echo "Data-collector is healthy!"
+              break
+            fi
+            if [ $i -eq 30 ]; then
+              echo "Data-collector failed to start"
+              docker compose -f docker/docker-compose.yml logs data-collector
+              exit 1
+            fi
+            sleep 5
+          done
+
+      - name: Run Playwright tests
+        run: cd e2e && npx playwright test
+        env:
+          CI: true
+          BASE_URL: http://localhost:3000
+
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: e2e/playwright-report/
+          retention-days: 14
+
+      - name: Cleanup Docker
+        if: always()
+        run: |
+          cd docker && docker compose down -v --remove-orphans
