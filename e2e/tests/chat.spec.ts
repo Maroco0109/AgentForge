@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { generateTestUser, registerUser, loginUser, createConversation, authenticatedContext } from './helpers';
 
-test.describe.skip('채팅 (Chat)', () => {
+test.describe('채팅 (Chat)', () => {
   test('대화 목록 페이지 렌더링', async ({ page, request }) => {
     const user = generateTestUser();
 
@@ -13,7 +13,7 @@ test.describe.skip('채팅 (Chat)', () => {
 
     // 로컬스토리지에 토큰 설정
     await page.evaluate((authToken) => {
-      localStorage.setItem('auth_token', authToken);
+      localStorage.setItem('access_token', authToken);
     }, token);
 
     await page.reload();
@@ -25,7 +25,7 @@ test.describe.skip('채팅 (Chat)', () => {
     await expect(page.locator('button:has-text("새 대화"), button:has-text("New Conversation")')).toBeVisible();
   });
 
-  test('새 대화 생성', async ({ page, request }) => {
+  test.skip('새 대화 생성 (백엔드 API 필요)', async ({ page, request }) => {
     const user = generateTestUser();
 
     // 사용자 등록 및 로그인
@@ -36,7 +36,7 @@ test.describe.skip('채팅 (Chat)', () => {
 
     // 로컬스토리지에 토큰 설정
     await page.evaluate((authToken) => {
-      localStorage.setItem('auth_token', authToken);
+      localStorage.setItem('access_token', authToken);
     }, token);
 
     await page.reload();
@@ -52,7 +52,7 @@ test.describe.skip('채팅 (Chat)', () => {
     await expect(page.locator('button:has-text("전송"), button:has-text("Send"), button[type="submit"]')).toBeVisible();
   });
 
-  test('메시지 입력 및 전송', async ({ page, request, browser }) => {
+  test.skip('메시지 입력 및 전송 (백엔드 API + WebSocket 필요)', async ({ page, request, browser }) => {
     const user = generateTestUser();
 
     // 사용자 등록 및 로그인
@@ -85,7 +85,7 @@ test.describe.skip('채팅 (Chat)', () => {
     await context.close();
   });
 
-  test('대화 목록에서 대화 선택', async ({ page, request, browser }) => {
+  test.skip('대화 목록에서 대화 선택 (백엔드 API 필요)', async ({ page, request, browser }) => {
     const user = generateTestUser();
 
     // 사용자 등록 및 로그인
@@ -130,7 +130,7 @@ test.describe.skip('채팅 (Chat)', () => {
     await context.close();
   });
 
-  test('WebSocket 연결 및 실시간 메시지 수신', async ({ page, request, browser }) => {
+  test.skip('WebSocket 연결 및 실시간 메시지 수신 (백엔드 WebSocket 필요)', async ({ page, request, browser }) => {
     const user = generateTestUser();
 
     // 사용자 등록 및 로그인

@@ -7,6 +7,7 @@ const OPEN_IN_EDITOR_MARKER = "__open_in_editor__";
 
 interface ChatWindowProps {
   onOpenDesign?: (design: Record<string, unknown>) => void;
+  conversationId?: string;
 }
 
 interface Message {
@@ -60,7 +61,7 @@ function formatDiscussionMessage(data: Record<string, unknown>): string {
   return content;
 }
 
-export default function ChatWindow({ onOpenDesign }: ChatWindowProps) {
+export default function ChatWindow({ onOpenDesign, conversationId: propConversationId }: ChatWindowProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [isConnected, setIsConnected] = useState(false);
@@ -322,7 +323,12 @@ export default function ChatWindow({ onOpenDesign }: ChatWindowProps) {
     let cancelled = false;
 
     const init = async () => {
-      const convId = await createConversation();
+      let convId: string | null;
+      if (propConversationId) {
+        convId = propConversationId;
+      } else {
+        convId = await createConversation();
+      }
       if (cancelled || !convId) return;
       setConversationId(convId);
       connectWebSocket(convId);
@@ -340,7 +346,7 @@ export default function ChatWindow({ onOpenDesign }: ChatWindowProps) {
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [propConversationId]);
 
   const handleSend = (e: React.FormEvent) => {
     e.preventDefault();

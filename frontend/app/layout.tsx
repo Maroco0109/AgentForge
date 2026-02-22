@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { AuthProviderWrapper } from "@/lib/auth-provider-wrapper";
 
 export const metadata: Metadata = {
   title: "AgentForge",
@@ -12,9 +13,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ko">
+    <html lang="ko" className="dark">
       <body className="antialiased">
-        {children}
+        <AuthProviderWrapper>
+          {children}
+        </AuthProviderWrapper>
       </body>
     </html>
   );
