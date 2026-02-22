@@ -47,7 +47,14 @@ if grep -q "^OPENAI_API_KEY=sk-your-openai-api-key-here" "$DOCKER_DIR/.env" || \
     read -rp "OpenAI API 키를 입력하세요 (Enter로 건너뛰기): " api_key
     if [ -n "$api_key" ]; then
         if grep -q "^OPENAI_API_KEY=" "$DOCKER_DIR/.env"; then
-            sed -i "s|^OPENAI_API_KEY=.*|OPENAI_API_KEY=$api_key|" "$DOCKER_DIR/.env"
+            python3 -c "
+import re, sys
+with open('$DOCKER_DIR/.env', 'r') as f:
+    content = f.read()
+content = re.sub(r'^OPENAI_API_KEY=.*', 'OPENAI_API_KEY=' + sys.argv[1], content, flags=re.MULTILINE)
+with open('$DOCKER_DIR/.env', 'w') as f:
+    f.write(content)
+" "$api_key"
         else
             echo "OPENAI_API_KEY=$api_key" >> "$DOCKER_DIR/.env"
         fi

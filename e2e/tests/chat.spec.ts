@@ -144,10 +144,10 @@ test.describe('채팅 (Chat)', () => {
     const context = await authenticatedContext(browser, token);
     const authPage = await context.newPage();
 
-    await authPage.goto(`/chat/${conversation.id}`);
-
-    // WebSocket 연결 대기 (네트워크 요청 확인)
+    // WebSocket 연결 대기 (네트워크 요청 확인) - goto 전에 등록
     const wsPromise = authPage.waitForEvent('websocket', { timeout: 10000 });
+
+    await authPage.goto(`/chat/${conversation.id}`);
 
     // 메시지 입력 및 전송
     const messageInput = authPage.locator('textarea, input[type="text"]').last();

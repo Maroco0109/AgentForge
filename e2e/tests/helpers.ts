@@ -1,5 +1,7 @@
 import { Browser, APIRequestContext } from '@playwright/test';
 
+const API_BASE = process.env.API_BASE_URL ?? 'http://localhost:8000';
+
 export interface TestUser {
   email: string;
   password: string;
@@ -38,7 +40,7 @@ export async function registerUser(
   request: APIRequestContext,
   user: TestUser
 ): Promise<void> {
-  const response = await request.post('http://localhost:8000/api/v1/auth/register', {
+  const response = await request.post(`${API_BASE}/api/v1/auth/register`, {
     data: {
       email: user.email,
       password: user.password,
@@ -59,7 +61,7 @@ export async function loginUser(
   request: APIRequestContext,
   user: Pick<TestUser, 'email' | 'password'>
 ): Promise<string> {
-  const response = await request.post('http://localhost:8000/api/v1/auth/login', {
+  const response = await request.post(`${API_BASE}/api/v1/auth/login`, {
     form: {
       username: user.email,
       password: user.password,
@@ -101,7 +103,7 @@ export async function createConversation(
   token: string,
   title: string
 ): Promise<ConversationResponse> {
-  const response = await request.post('http://localhost:8000/api/v1/conversations', {
+  const response = await request.post(`${API_BASE}/api/v1/conversations`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },

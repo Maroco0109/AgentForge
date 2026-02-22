@@ -438,8 +438,8 @@ class TestTemplateSharing:
         assert "Shared Template 1" in names
         assert "Shared Template 2" in names
 
-    async def test_template_limit_enforcement(self, template_client: AsyncClient):
-        """Test that template creation respects per-user limits."""
+    async def test_can_create_multiple_templates(self, template_client: AsyncClient):
+        """Test that users can create multiple templates within limits."""
 
         token = await register_and_login(template_client)
 
