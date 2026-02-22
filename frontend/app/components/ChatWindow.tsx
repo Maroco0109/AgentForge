@@ -8,6 +8,50 @@ interface Message {
   role: "user" | "assistant" | "system";
   content: string;
   timestamp: Date;
+  metadata?: Record<string, unknown>;
+}
+
+function formatDiscussionMessage(data: Record<string, unknown>): string {
+  const type = data.type as string;
+  const content = (data.content as string) || "";
+
+  if (type === "clarification") {
+    const questions = (data.questions as string[]) || [];
+    return `${content}\n\n${questions.map((q, i) => `${i + 1}. ${q}`).join("\n")}`;
+  }
+
+  if (type === "designs_presented") {
+    const designs = (data.designs as Array<Record<string, unknown>>) || [];
+    const designTexts = designs.map((d, i) => {
+      const name = d.name as string;
+      const desc = d.description as string;
+      const complexity = d.complexity as string;
+      const cost = d.estimated_cost as string;
+      const recommended = d.recommended ? " ⭐ Recommended" : "";
+      const pros = (d.pros as string[]) || [];
+      const cons = (d.cons as string[]) || [];
+      return (
+        `**${i + 1}. ${name}${recommended}**\n` +
+        `${desc}\n` +
+        `Complexity: ${complexity} | Cost: ${cost}\n` +
+        `Pros: ${pros.join(", ")}\n` +
+        `Cons: ${cons.join(", ")}`
+      );
+    });
+    return `${content}\n\n${designTexts.join("\n\n")}`;
+  }
+
+  if (type === "critique_complete") {
+    const critiques = (data.critiques as Array<Record<string, unknown>>) || [];
+    const critiqueTexts = critiques.map((c) => {
+      const designName = c.design_name as string;
+      const score = c.overall_score as number;
+      return `**${designName}** (Score: ${score}/10)`;
+    });
+    return `${content}\n\n${critiqueTexts.join("\n")}`;
+  }
+
+  return content;
 }
 
 export default function ChatWindow() {
@@ -31,7 +75,8 @@ export default function ChatWindow() {
 
   const connectWebSocket = () => {
     const wsBase = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8000";
-    const wsUrl = `${wsBase}/api/v1/ws/chat/${conversationId}`;
+    const token = typeof window !== "undefined" ? localStorage.getItem("access_token") || "" : "";
+    const wsUrl = `${wsBase}/api/v1/ws/chat/${conversationId}${token ? `?token=${token}` : ""}`;
     const ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {
@@ -53,16 +98,114 @@ export default function ChatWindow() {
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        setIsTyping(false);
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: crypto.randomUUID(),
-            role: "assistant",
-            content: data.content || data.message || JSON.stringify(data),
-            timestamp: new Date(),
-          },
-        ]);
+        const type = data.type as string;
+
+        switch (type) {
+          case "user_message_received":
+            // Already shown in UI, skip
+            break;
+
+          case "clarification":
+          case "designs_presented":
+          case "critique_complete":
+          case "plan_generated": {
+            setIsTyping(false);
+            const formatted = formatDiscussionMessage(data);
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: crypto.randomUUID(),
+                role: "assistant",
+                content: formatted,
+                timestamp: new Date(),
+                metadata: data,
+              },
+            ]);
+            break;
+          }
+
+          case "pipeline_started":
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: crypto.randomUUID(),
+                role: "system",
+                content: `Pipeline started: ${data.design_name || "Running"} (${data.agent_count || 0} agents)`,
+                timestamp: new Date(),
+              },
+            ]);
+            break;
+
+          case "agent_completed":
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: crypto.randomUUID(),
+                role: "system",
+                content: `Agent "${data.agent_name}" completed (${data.duration || 0}s)`,
+                timestamp: new Date(),
+              },
+            ]);
+            break;
+
+          case "pipeline_result": {
+            setIsTyping(false);
+            const result = data.result || {};
+            const output = result.output || data.content || "Pipeline completed.";
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: crypto.randomUUID(),
+                role: "assistant",
+                content: output,
+                timestamp: new Date(),
+                metadata: { pipeline_result: result },
+              },
+            ]);
+            break;
+          }
+
+          case "pipeline_failed":
+            setIsTyping(false);
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: crypto.randomUUID(),
+                role: "system",
+                content: `Pipeline failed: ${data.reason || "Unknown error"}`,
+                timestamp: new Date(),
+              },
+            ]);
+            break;
+
+          case "security_warning":
+          case "error":
+            setIsTyping(false);
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: crypto.randomUUID(),
+                role: "system",
+                content: data.content || "An error occurred.",
+                timestamp: new Date(),
+              },
+            ]);
+            break;
+
+          case "assistant_message":
+          default:
+            setIsTyping(false);
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: crypto.randomUUID(),
+                role: "assistant",
+                content: data.content || data.message || JSON.stringify(data),
+                timestamp: new Date(),
+              },
+            ]);
+            break;
+        }
       } catch {
         console.error("Failed to parse WebSocket message:", event.data);
       }

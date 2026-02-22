@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     DEFAULT_LLM_PROVIDER: str = "openai"
     DEFAULT_LLM_MODEL: str = "gpt-4o-mini"
 
+    # Data Collector settings
+    DATA_COLLECTOR_URL: str = "http://localhost:8001"
+
     @model_validator(mode="after")
     def validate_secret_key(self):
         """Provide default SECRET_KEY in debug mode, require it in production."""

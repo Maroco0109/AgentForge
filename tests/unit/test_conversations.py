@@ -1,67 +1,93 @@
-"""Tests for conversation endpoints."""
+"""Tests for conversation endpoints with authentication."""
 
 import uuid
 
 import pytest
 
+from backend.gateway.auth import create_access_token
+
+
+def _auth_header(user_id: str, role: str = "free") -> dict:
+    """Create authorization header with JWT token."""
+    token = create_access_token(user_id, role)
+    return {"Authorization": f"Bearer {token}"}
+
 
 @pytest.mark.asyncio
 async def test_create_conversation(client, test_user):
-    """Test creating a new conversation."""
+    """Test creating a new conversation with auth."""
+    headers = _auth_header(str(test_user.id))
     response = await client.post(
         "/api/v1/conversations",
-        json={"title": "Test Conversation", "user_id": str(test_user.id)},
+        json={"title": "Test Conversation"},
+        headers=headers,
     )
     assert response.status_code == 201
     data = response.json()
     assert data["title"] == "Test Conversation"
     assert data["status"] == "active"
+    assert data["user_id"] == str(test_user.id)
     assert "id" in data
 
 
 @pytest.mark.asyncio
-async def test_create_conversation_without_user_id(client):
-    """Test creating conversation without explicit user_id.
-
-    In Phase 1, user_id is auto-generated when not provided.
-    SQLite (test) doesn't enforce FK constraints, so this succeeds.
-    PostgreSQL (production) would reject with FK violation.
-    Phase 2 (auth) will always provide valid user_id from session.
-    """
+async def test_create_conversation_no_auth(client):
+    """Test creating conversation without auth returns 403."""
     response = await client.post(
         "/api/v1/conversations",
-        json={"title": "Auto User Conv"},
+        json={"title": "No Auth Conv"},
     )
-    # SQLite: 201 (no FK enforcement), PostgreSQL: 500 (FK violation)
-    assert response.status_code in [201, 500]
+    assert response.status_code == 403
 
 
 @pytest.mark.asyncio
-async def test_list_conversations(client, test_user):
-    """Test listing conversations."""
-    # Create a conversation first
+async def test_list_conversations_filters_by_user(client, test_user):
+    """Test listing conversations only returns user's own."""
+    headers = _auth_header(str(test_user.id))
+
+    # Create two conversations
     await client.post(
         "/api/v1/conversations",
-        json={"title": "List Test", "user_id": str(test_user.id)},
+        json={"title": "Conv 1"},
+        headers=headers,
     )
-    response = await client.get("/api/v1/conversations")
+    await client.post(
+        "/api/v1/conversations",
+        json={"title": "Conv 2"},
+        headers=headers,
+    )
+
+    response = await client.get("/api/v1/conversations", headers=headers)
     assert response.status_code == 200
     data = response.json()
     assert isinstance(data, list)
+    assert len(data) >= 2
+    for conv in data:
+        assert conv["user_id"] == str(test_user.id)
+
+
+@pytest.mark.asyncio
+async def test_list_conversations_no_auth(client):
+    """Test listing conversations without auth returns 403."""
+    response = await client.get("/api/v1/conversations")
+    assert response.status_code == 403
 
 
 @pytest.mark.asyncio
 async def test_get_conversation(client, test_user):
-    """Test getting a specific conversation."""
+    """Test getting a specific conversation with auth."""
+    headers = _auth_header(str(test_user.id))
+
     # Create conversation
     create_resp = await client.post(
         "/api/v1/conversations",
-        json={"title": "Get Test", "user_id": str(test_user.id)},
+        json={"title": "Get Test"},
+        headers=headers,
     )
     conv_id = create_resp.json()["id"]
 
     # Get it
-    response = await client.get(f"/api/v1/conversations/{conv_id}")
+    response = await client.get(f"/api/v1/conversations/{conv_id}", headers=headers)
     assert response.status_code == 200
     data = response.json()
     assert data["title"] == "Get Test"
@@ -69,8 +95,43 @@ async def test_get_conversation(client, test_user):
 
 
 @pytest.mark.asyncio
-async def test_get_conversation_not_found(client):
+async def test_get_conversation_not_found(client, test_user):
     """Test getting a non-existent conversation returns 404."""
+    headers = _auth_header(str(test_user.id))
     fake_id = str(uuid.uuid4())
-    response = await client.get(f"/api/v1/conversations/{fake_id}")
+    response = await client.get(f"/api/v1/conversations/{fake_id}", headers=headers)
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_get_conversation_wrong_user(client, test_user, test_session):
+    """Test getting another user's conversation returns 404."""
+    from backend.shared.models import User, UserRole
+
+    # Create another user
+    other_user = User(
+        id=uuid.uuid4(),
+        email="other@example.com",
+        hashed_password="hashed",
+        display_name="Other User",
+        role=UserRole.FREE,
+    )
+    test_session.add(other_user)
+    await test_session.commit()
+    await test_session.refresh(other_user)
+
+    # Create conversation as test_user
+    headers = _auth_header(str(test_user.id))
+    create_resp = await client.post(
+        "/api/v1/conversations",
+        json={"title": "Private Conv"},
+        headers=headers,
+    )
+    conv_id = create_resp.json()["id"]
+
+    # Try to access as other_user
+    other_headers = _auth_header(str(other_user.id))
+    response = await client.get(
+        f"/api/v1/conversations/{conv_id}", headers=other_headers
+    )
     assert response.status_code == 404

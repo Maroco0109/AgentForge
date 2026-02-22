@@ -7,8 +7,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from backend.gateway.auth import get_current_user
 from backend.shared.database import get_db
-from backend.shared.models import Conversation
+from backend.shared.models import Conversation, User
 from backend.shared.schemas import (
     ConversationCreate,
     ConversationDetailResponse,
@@ -22,15 +23,12 @@ router = APIRouter()
 @router.post("/conversations", response_model=ConversationResponse, status_code=201)
 async def create_conversation(
     conversation: ConversationCreate,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> Conversation:
     """Create a new conversation."""
-    # For Phase 1, use provided user_id or create a dummy UUID
-    # In Phase 2, this will come from authenticated user
-    user_id = conversation.user_id or uuid.uuid4()
-
     new_conversation = Conversation(
-        user_id=user_id,
+        user_id=current_user.id,
         title=conversation.title,
     )
 
@@ -43,12 +41,15 @@ async def create_conversation(
 
 @router.get("/conversations", response_model=list[ConversationResponse])
 async def list_conversations(
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> list[Conversation]:
-    """List all conversations for the current user."""
-    # For Phase 1, return all conversations
-    # In Phase 2, filter by authenticated user_id
-    result = await db.execute(select(Conversation).order_by(Conversation.updated_at.desc()))
+    """List conversations for the current user."""
+    result = await db.execute(
+        select(Conversation)
+        .where(Conversation.user_id == current_user.id)
+        .order_by(Conversation.updated_at.desc())
+    )
     conversations = result.scalars().all()
 
     return list(conversations)
@@ -57,6 +58,7 @@ async def list_conversations(
 @router.get("/conversations/{conversation_id}", response_model=ConversationDetailResponse)
 async def get_conversation(
     conversation_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """Get a conversation with its messages."""
@@ -64,6 +66,7 @@ async def get_conversation(
         select(Conversation)
         .options(selectinload(Conversation.messages))
         .where(Conversation.id == conversation_id)
+        .where(Conversation.user_id == current_user.id)
     )
     conversation = result.scalar_one_or_none()
 
