@@ -45,7 +45,7 @@ test.describe('인증 (Authentication)', () => {
     await page.click('button[type="submit"]');
 
     // 에러 메시지 확인
-    await expect(page.locator('text=/already exists|이미 존재/i')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('text=/already (exists|registered)|이미 존재/i')).toBeVisible({ timeout: 5000 });
   });
 
   test('로그인 성공 → 메인 페이지 리다이렉트', async ({ page, request }) => {
