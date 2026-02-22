@@ -19,6 +19,7 @@ export interface TemplateDetail extends TemplateListItem {
 
 export function useTemplates() {
   const [templates, setTemplates] = useState<TemplateListItem[]>([]);
+  const [sharedTemplates, setSharedTemplates] = useState<TemplateListItem[]>([]);
   const [loading, setLoading] = useState(false);
 
   const fetchTemplates = useCallback(async () => {
@@ -28,6 +29,18 @@ export function useTemplates() {
       setTemplates(data);
     } catch (error) {
       console.error("Failed to fetch templates:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const fetchSharedTemplates = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await apiFetch<TemplateListItem[]>("/api/v1/templates/shared");
+      setSharedTemplates(data);
+    } catch (error) {
+      console.error("Failed to fetch shared templates:", error);
     } finally {
       setLoading(false);
     }
@@ -76,12 +89,45 @@ export function useTemplates() {
     [fetchTemplates]
   );
 
+  const forkTemplate = useCallback(
+    async (id: string) => {
+      try {
+        await apiFetch(`/api/v1/templates/${id}/fork`, { method: "POST" });
+        await fetchTemplates();
+      } catch (error) {
+        console.error("Failed to fork template:", error);
+        throw error;
+      }
+    },
+    [fetchTemplates]
+  );
+
+  const shareTemplate = useCallback(
+    async (id: string, isPublic: boolean) => {
+      try {
+        await apiFetch(`/api/v1/templates/${id}`, {
+          method: "PUT",
+          body: JSON.stringify({ is_public: isPublic }),
+        });
+        await fetchTemplates();
+      } catch (error) {
+        console.error("Failed to update template sharing:", error);
+        throw error;
+      }
+    },
+    [fetchTemplates]
+  );
+
   return {
     templates,
+    sharedTemplates,
     loading,
     fetchTemplates,
+    fetchSharedTemplates,
     loadTemplate,
     saveTemplate,
     deleteTemplate,
+    forkTemplate,
+    shareTemplate,
   };
 }

@@ -184,6 +184,7 @@ class TemplateUpdate(BaseModel):
     description: str | None = None
     graph_data: dict | None = None
     design_data: dict | None = None
+    is_public: bool | None = None
 
     @field_validator("graph_data")
     @classmethod
