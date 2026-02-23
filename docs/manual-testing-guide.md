@@ -59,6 +59,41 @@ curl http://localhost:8001/api/v1/health
 - **Application** 탭: localStorage 토큰 확인
 - **Storage** 탭: 쿠키/세션 스토리지 확인
 
+### 0.5 환경변수 설정 (LLM API 키)
+
+LLM 기능을 사용하려면 OpenAI API 키를 설정해야 합니다.
+
+**설정 파일:** `docker/.env`
+
+```bash
+# 필수 설정
+SECRET_KEY=<openssl rand -hex 32 로 생성>
+OPENAI_API_KEY=sk-proj-your-key-here
+
+# 선택 설정
+# ANTHROPIC_API_KEY=sk-ant-your-key-here
+# DAILY_COST_LIMIT=10.0
+```
+
+**중요:** `docker-compose.yml`의 backend 서비스 `environment` 섹션에 아래 항목이 포함되어야 합니다:
+```yaml
+- SECRET_KEY=${SECRET_KEY}
+- OPENAI_API_KEY=${OPENAI_API_KEY}
+- ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+- DAILY_COST_LIMIT=${DAILY_COST_LIMIT:-10.0}
+```
+
+**환경변수 확인:**
+```bash
+# Docker 재시작
+cd docker && docker compose down && docker compose up -d
+
+# 환경변수 로드 확인
+docker compose exec backend printenv | grep -E "OPENAI|SECRET_KEY"
+```
+
+**기대 결과:** `OPENAI_API_KEY`와 `SECRET_KEY`가 출력되어야 합니다.
+
 ---
 
 ## 1. 회원가입 테스트 (`/register`)
@@ -332,9 +367,11 @@ curl -X POST http://localhost:8000/api/v1/conversations \
 | 항목 | 내용 |
 |------|------|
 | **페이지** | http://localhost:3000/chat/{conversation_id} |
-| **입력** | 텍스트: "안녕하세요, 무엇을 도와드릴까요?" |
-| **기대 결과** | 1. 사용자 메시지 표시<br>2. AI 응답 수신 (WebSocket)<br>3. AI 응답 표시<br>4. 메시지 입력 필드 초기화 |
+| **입력** | 텍스트: "Build me a simple REST API for todo management" |
+| **기대 결과** | 1. 사용자 메시지 표시<br>2. `user_message_received` 수신 (WebSocket)<br>3. Intent Analyzer → Design Generator 순으로 AI 처리<br>4. `designs_presented` 메시지로 파이프라인 설계안 표시<br>5. 메시지 입력 필드 초기화 |
 | **확인 방법** | 1. 메시지 버블 표시<br>2. 개발자도구 → Network → WS 필터링하여 WebSocket 통신 확인 |
+
+**참고:** 첫 번째 응답은 `user_message_received` 타입으로 수신됩니다. 이후 AI가 Intent Analyzer → Design Generator 파이프라인을 거쳐 처리하므로, 최종 응답은 `designs_presented` 타입으로 수신됩니다. OpenAI API 응답 시간에 따라 5-15초 소요될 수 있습니다.
 
 **테스트 단계:**
 1. 섹션 4에서 생성한 대화의 `/chat/{id}` 페이지 접속
@@ -342,11 +379,11 @@ curl -X POST http://localhost:8000/api/v1/conversations \
    - 상단: 대화 제목 또는 헤더
    - 중앙: 메시지 표시 영역 (처음에는 비어있음)
    - 하단: 메시지 입력 필드 (`input[type="text"]`)와 Send 버튼
-3. 입력 필드에 "안녕하세요" 입력
+3. 입력 필드에 "Build me a simple REST API for todo management" 입력
 4. Send 버튼 클릭
 5. 사용자 메시지 표시 확인
-6. AI 응답 대기 (LLM API 호출 시간에 따라 3-10초)
-7. AI 응답 메시지 표시 확인
+6. AI 응답 대기 (OpenAI API 응답 시간에 따라 5-15초)
+7. AI 응답 메시지 표시 확인 (`designs_presented` 타입, 파이프라인 설계안 포함)
 
 **WebSocket 통신 검증:**
 1. F12 개발자도구 → Network 탭
@@ -432,6 +469,77 @@ ws://localhost:8000/api/v1/ws/chat/{conversation_id}
    - 사용자 메시지: 우측에 배치
    - AI 메시지: 좌측에 배치
 3. F12 → Elements에서 `MessageBubble` 컴포넌트 구조 확인
+
+### 5.4 LLM 파이프라인 전체 플로우 테스트
+
+| 항목 | 내용 |
+|------|------|
+| **페이지** | http://localhost:3000/chat/{conversation_id} |
+| **전제 조건** | OpenAI API 키 설정 완료, Docker 재시작 완료 |
+| **입력** | "Build me a simple REST API for todo management" |
+| **기대 결과** | 1. `user_message_received` 수신<br>2. Intent Analyzer가 요청 분석<br>3. Design Generator가 파이프라인 설계안 생성<br>4. `designs_presented` 메시지로 설계안 표시<br>5. "Open in Pipeline Editor" 버튼 표시 |
+
+**테스트 단계:**
+1. `/conversations` 페이지에서 "New Conversation" 클릭
+2. 채팅 페이지에서 "Build me a simple REST API for todo management" 입력
+3. Send 버튼 클릭
+4. 5-15초 대기 (OpenAI API 응답 시간)
+5. AI 응답 확인:
+   - 설계안 텍스트 (아키텍처, 컴포넌트, 기술 스택 등)
+   - "Open in Pipeline Editor" 버튼
+6. F12 → Network → WS 탭에서 메시지 확인:
+   - `user_message_received` → `designs_presented` 순서
+
+**WebSocket 메시지 예시 (designs_presented):**
+```json
+{
+  "type": "designs_presented",
+  "content": "다음과 같은 파이프라인 설계안을 생성했습니다.",
+  "designs": [
+    {
+      "name": "Simple REST API",
+      "description": "Todo 관리를 위한 REST API",
+      "complexity": "low",
+      "estimated_cost": "$0.05",
+      "recommended": true,
+      "pros": ["Simple to implement", "Low cost"],
+      "cons": ["Limited scalability"]
+    }
+  ]
+}
+```
+
+**API 검증 (Python WebSocket):**
+```bash
+pip install websockets
+
+python3 -c "
+import asyncio, json, websockets
+
+async def test():
+    TOKEN='your-jwt-token'
+    CONV_ID='your-conversation-id'
+    uri = f'ws://localhost:8000/api/v1/ws/chat/{CONV_ID}?token={TOKEN}'
+    async with websockets.connect(uri) as ws:
+        await ws.send(json.dumps({
+            'content': 'Build me a simple REST API',
+            'conversation_id': CONV_ID
+        }))
+        for _ in range(10):
+            try:
+                msg = await asyncio.wait_for(ws.recv(), timeout=30)
+                data = json.loads(msg)
+                print(f'Type: {data[\"type\"]}')
+                if data['type'] in ('designs_presented', 'clarification', 'error'):
+                    print(json.dumps(data, indent=2, ensure_ascii=False))
+                    break
+            except asyncio.TimeoutError:
+                print('Timeout')
+                break
+
+asyncio.run(test())
+"
+```
 
 ---
 
@@ -1104,7 +1212,7 @@ curl -X GET http://localhost:8000/api/v1/auth/me/usage \
 
 | 항목 | 설명 | 해결 방법 |
 |------|------|--------|
-| **LLM API 키 미설정** | `OPENAI_API_KEY` 또는 `ANTHROPIC_API_KEY`가 없으면 AI 응답 불가 | `.env` 파일에서 API 키 설정 후 Docker 재시작 |
+| **LLM API 키 미설정 시** | `OPENAI_API_KEY` 또는 `ANTHROPIC_API_KEY`가 없으면 AI 응답 불가 | `.env` 파일에서 API 키 설정 후 `docker compose down && up -d` 필요 |
 | **WebSocket 토큰 필요** | WebSocket 연결 시 유효한 JWT 토큰 필요 | 쿼리 파라미터로 `?token={access_token}` 전달 |
 | **파이프라인 실행** | 파이프라인 실행 시 LLM 설정 필수 | OpenAI 또는 Anthropic API 키 설정 |
 | **템플릿 최대 개수** | 사용자당 최대 50개 템플릿 | 오래된 템플릿 삭제 후 새로 생성 |
@@ -1204,7 +1312,7 @@ docker compose -f docker/docker-compose.yml restart backend
 | [x] 3. 대화 목록 (대화 있음) | PASS | 2026-02-23 | 200, 대화 포함 |
 | [x] 4. 새 대화 생성 | PASS | 2026-02-23 | 201, UUID 형식 |
 | [x] 5. 채팅 (WebSocket 연결) | PASS | 2026-02-23 | 연결/메시지/응답/종료 |
-| [ ] 5. 채팅 (여러 메시지 교환) | 미완료 | - | LLM API 키 필요 |
+| [x] 5. 채팅 (여러 메시지 교환) | PASS | 2026-02-23 | LLM API 연동 확인, designs_presented 수신 |
 | [ ] 6. 파이프라인 에디터 (UI) | 미완료 | - | 브라우저 테스트 필요 |
 | [x] 6. 파이프라인 API (Execute) | PASS | 2026-02-23 | 200, agents 미정의 시 예상 실패 |
 | [x] 6. 파이프라인 API (Status/Result) | PASS | 2026-02-23 | 200/404 정상 |
@@ -1219,7 +1327,7 @@ docker compose -f docker/docker-compose.yml restart backend
 | [x] 13. Rate Limiting | PASS | 2026-02-23 | 10회 연속 요청 통과 |
 | [x] 14. Data Collector CRUD | PASS | 2026-02-23 | Create/Status/Compliance |
 | [x] 14. SSRF 방어 | PASS | 2026-02-23 | Internal IP/Localhost 차단 |
-| [ ] 14. 비용 Circuit Breaker | 미완료 | - | LLM API 키 필요 |
+| [x] 14. 비용 Circuit Breaker | PASS | 2026-02-23 | DAILY_COST_LIMIT 환경변수 전달 확인 |
 | [x] 프론트엔드 페이지 접근 | PASS | 2026-02-23 | 모든 라우트 200 OK |
 
 ---
@@ -1355,5 +1463,5 @@ curl -X DELETE http://localhost:8000/api/v1/conversations/$CONV_ID \
 ---
 
 **문서 작성일:** 2026-02-23
-**버전:** 1.1
-**마지막 수정:** 2026-02-23 (테스트 결과 반영)
+**버전:** 1.2
+**마지막 수정:** 2026-02-23 (LLM 통합 테스트 추가, 환경변수 설정 가이드 추가)

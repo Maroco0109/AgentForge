@@ -30,6 +30,10 @@ services:
       - DEBUG=true
       - CORS_ORIGINS=["http://localhost:3000"]
       - DATA_COLLECTOR_URL=http://data-collector:8001
+      - SECRET_KEY=${SECRET_KEY:-dev-only-secret-change-in-production}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - DAILY_COST_LIMIT=${DAILY_COST_LIMIT:-10.0}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
       interval: 10s
