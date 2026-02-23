@@ -19,6 +19,5 @@ ENV PYTHONPATH=/app
 
 EXPOSE 8000
 
-COPY backend/entrypoint.sh /app/backend/entrypoint.sh
 RUN chmod +x /app/backend/entrypoint.sh
 ENTRYPOINT ["/app/backend/entrypoint.sh"]
