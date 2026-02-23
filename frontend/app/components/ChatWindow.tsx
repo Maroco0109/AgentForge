@@ -1,9 +1,11 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { apiFetch } from "@/lib/api";
 import MessageBubble from "./MessageBubble";
 
 const OPEN_IN_EDITOR_MARKER = "__open_in_editor__";
+const MAX_RECONNECT_ATTEMPTS = 5;
 
 interface ChatWindowProps {
   onOpenDesign?: (design: Record<string, unknown>) => void;
@@ -71,6 +73,7 @@ export default function ChatWindow({ onOpenDesign, conversationId: propConversat
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout>();
   const reconnectAttemptsRef = useRef(0);
+  const shouldReconnectRef = useRef(true);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -128,6 +131,25 @@ export default function ChatWindow({ onOpenDesign, conversationId: propConversat
         },
       ]);
       return null;
+    }
+  };
+
+  const fetchHistory = async (convId: string) => {
+    try {
+      const data = await apiFetch<{
+        messages: Array<{ id: string; role: string; content: string; created_at: string }>;
+      }>(`/api/v1/conversations/${convId}`);
+      const history = (data.messages || []).map((msg) => ({
+        id: msg.id,
+        role: msg.role as "user" | "assistant" | "system",
+        content: msg.content,
+        timestamp: new Date(msg.created_at),
+      }));
+      if (history.length > 0) {
+        setMessages(history);
+      }
+    } catch (error) {
+      console.error("Failed to fetch conversation history:", error);
     }
   };
 
@@ -306,11 +328,27 @@ export default function ChatWindow({ onOpenDesign, conversationId: propConversat
       setIsTyping(false);
       wsRef.current = null;
 
+      if (!shouldReconnectRef.current) return;
+
+      if (reconnectAttemptsRef.current >= MAX_RECONNECT_ATTEMPTS) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: crypto.randomUUID(),
+            role: "system",
+            content: "Connection lost. Please refresh the page to reconnect.",
+            timestamp: new Date(),
+          },
+        ]);
+        return;
+      }
+
       // Exponential backoff reconnect
       const backoffDelay = Math.min(30000, 1000 * Math.pow(2, reconnectAttemptsRef.current));
       reconnectAttemptsRef.current += 1;
 
       reconnectTimeoutRef.current = setTimeout(() => {
+        if (!shouldReconnectRef.current) return;
         console.log(`Reconnecting (attempt ${reconnectAttemptsRef.current})...`);
         connectWebSocket(convId);
       }, backoffDelay);
@@ -322,10 +360,14 @@ export default function ChatWindow({ onOpenDesign, conversationId: propConversat
   useEffect(() => {
     let cancelled = false;
 
+    shouldReconnectRef.current = true;
+    reconnectAttemptsRef.current = 0;
+
     const init = async () => {
       let convId: string | null;
       if (propConversationId) {
         convId = propConversationId;
+        await fetchHistory(convId);
       } else {
         convId = await createConversation();
       }
@@ -338,6 +380,7 @@ export default function ChatWindow({ onOpenDesign, conversationId: propConversat
 
     return () => {
       cancelled = true;
+      shouldReconnectRef.current = false;
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
       }

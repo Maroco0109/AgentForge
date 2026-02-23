@@ -10,7 +10,7 @@ interface TemplateListPanelProps {
   loading: boolean;
   sharedLoading: boolean;
   onClose: () => void;
-  onSave: (name: string, description: string) => void;
+  onSave: (name: string, description: string) => Promise<void> | void;
   onLoad: (id: string) => void;
   onDelete: (id: string) => void;
   onFork: (id: string) => void;
@@ -48,10 +48,21 @@ export default function TemplateListPanel({
     }
   }, [activeTab, onRefreshShared]);
 
-  const handleSave = () => {
-    if (!name.trim()) return;
-    onSave(name.trim(), description.trim());
-    onClose();
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
+
+  const handleSave = async () => {
+    if (!name.trim() || isSaving) return;
+    setIsSaving(true);
+    setSaveError("");
+    try {
+      await onSave(name.trim(), description.trim());
+      onClose();
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Failed to save template");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const displayList = activeTab === "my" ? templates : sharedTemplates;
@@ -100,12 +111,17 @@ export default function TemplateListPanel({
                   className="w-full bg-gray-800 text-gray-100 rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary-500 resize-none"
                 />
               </div>
+              {saveError && (
+                <div className="text-red-400 text-xs bg-red-900/20 border border-red-800 rounded px-2 py-1.5">
+                  {saveError}
+                </div>
+              )}
               <button
                 onClick={handleSave}
-                disabled={!name.trim()}
+                disabled={!name.trim() || isSaving}
                 className="w-full bg-primary-600 hover:bg-primary-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white py-2 rounded text-sm transition-colors"
               >
-                Save Template
+                {isSaving ? "Saving..." : "Save Template"}
               </button>
             </div>
           )}

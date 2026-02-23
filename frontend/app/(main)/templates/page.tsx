@@ -16,16 +16,19 @@ interface TemplateListItem {
 export default function TemplatesPage() {
   const [templates, setTemplates] = useState<TemplateListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const router = useRouter();
 
   const fetchTemplates = useCallback(async () => {
     setIsLoading(true);
+    setError("");
     try {
       const data = await apiFetch<TemplateListItem[]>("/api/v1/templates");
       setTemplates(data);
-    } catch (error) {
-      console.error("Failed to fetch templates:", error);
+    } catch (err) {
+      console.error("Failed to fetch templates:", err);
+      setError(err instanceof Error ? err.message : "Failed to load templates");
     } finally {
       setIsLoading(false);
     }
@@ -66,6 +69,19 @@ export default function TemplatesPage() {
             className="w-full bg-gray-900 text-gray-100 border border-gray-700 rounded-md px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent placeholder:text-gray-500"
           />
         </div>
+
+        {/* Error */}
+        {error && (
+          <div className="mb-6 text-red-400 text-sm bg-red-900/20 border border-red-800 rounded-md px-4 py-3 flex items-center justify-between">
+            <span>{error}</span>
+            <button
+              onClick={fetchTemplates}
+              className="text-red-300 hover:text-red-100 text-xs underline ml-4"
+            >
+              Retry
+            </button>
+          </div>
+        )}
 
         {/* Template grid */}
         {isLoading ? (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { AVAILABLE_ROLES, getRoleConfig } from "../utils/nodeDefaults";
 
 interface ToolbarProps {
@@ -23,11 +23,23 @@ export default function Toolbar({
   nodeCount,
 }: ToolbarProps) {
   const [showDropdown, setShowDropdown] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!showDropdown) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showDropdown]);
 
   return (
     <div className="flex items-center gap-2 px-3 py-2 bg-gray-900 border-b border-gray-700">
       {/* Add Node dropdown */}
-      <div className="relative">
+      <div className="relative" ref={dropdownRef}>
         <button
           onClick={() => setShowDropdown(!showDropdown)}
           className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-200 text-sm rounded transition-colors"

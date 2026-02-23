@@ -14,6 +14,8 @@ interface Conversation {
 export default function ConversationsPage() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isCreating, setIsCreating] = useState(false);
+  const [error, setError] = useState("");
   const router = useRouter();
 
   const fetchConversations = useCallback(async () => {
@@ -32,14 +34,20 @@ export default function ConversationsPage() {
   }, [fetchConversations]);
 
   const handleNewConversation = async () => {
+    if (isCreating) return;
+    setIsCreating(true);
+    setError("");
     try {
       const data = await apiFetch<Conversation>("/api/v1/conversations", {
         method: "POST",
         body: JSON.stringify({ title: "New Conversation" }),
       });
       router.push(`/chat/${data.id}`);
-    } catch (error) {
-      console.error("Failed to create conversation:", error);
+    } catch (err) {
+      console.error("Failed to create conversation:", err);
+      setError(err instanceof Error ? err.message : "Failed to create conversation");
+    } finally {
+      setIsCreating(false);
     }
   };
 
@@ -63,11 +71,19 @@ export default function ConversationsPage() {
           <h1 className="text-2xl font-bold text-gray-100">Conversations</h1>
           <button
             onClick={handleNewConversation}
-            className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-sm rounded-md font-medium transition-colors"
+            disabled={isCreating}
+            className="px-4 py-2 bg-primary-600 hover:bg-primary-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white text-sm rounded-md font-medium transition-colors"
           >
-            New Conversation
+            {isCreating ? "Creating..." : "New Conversation"}
           </button>
         </div>
+
+        {/* Error */}
+        {error && (
+          <div className="mb-4 text-red-400 text-sm bg-red-900/20 border border-red-800 rounded-md px-3 py-2">
+            {error}
+          </div>
+        )}
 
         {/* List */}
         {isLoading ? (
@@ -77,9 +93,10 @@ export default function ConversationsPage() {
             <p className="text-gray-500 mb-4">No conversations yet</p>
             <button
               onClick={handleNewConversation}
-              className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-sm rounded-md font-medium transition-colors"
+              disabled={isCreating}
+              className="px-4 py-2 bg-primary-600 hover:bg-primary-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white text-sm rounded-md font-medium transition-colors"
             >
-              Start your first conversation
+              {isCreating ? "Creating..." : "Start your first conversation"}
             </button>
           </div>
         ) : (

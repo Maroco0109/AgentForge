@@ -30,8 +30,19 @@ export async function apiFetch<T>(
   });
 
   if (!response.ok) {
+    // Clear expired/invalid token and redirect to login on 401
+    if (response.status === 401 && typeof window !== "undefined") {
+      localStorage.removeItem("access_token");
+      window.location.href = "/login";
+      return undefined as T;
+    }
+
     const error = await response.json().catch(() => ({ detail: response.statusText }));
-    throw new Error(error.detail || `API error: ${response.status}`);
+    const detail = error.detail;
+    if (Array.isArray(detail)) {
+      throw new Error(detail.map((d: { msg?: string }) => d.msg || "Validation error").join(", "));
+    }
+    throw new Error(typeof detail === "string" ? detail : `API error: ${response.status}`);
   }
 
   if (response.status === 204) {

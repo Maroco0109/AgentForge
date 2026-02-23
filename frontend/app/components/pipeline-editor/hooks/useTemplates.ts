@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { apiFetch } from "@/lib/api";
 
 export interface TemplateListItem {
@@ -22,12 +22,19 @@ export function useTemplates() {
   const [sharedTemplates, setSharedTemplates] = useState<TemplateListItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [sharedLoading, setSharedLoading] = useState(false);
+  const lastFetchRef = useRef(0);
+  const lastSharedFetchRef = useRef(0);
+  const CACHE_TTL = 30000; // 30 seconds
 
-  const fetchTemplates = useCallback(async () => {
+  const fetchTemplates = useCallback(async (force = false) => {
+    if (!force && lastFetchRef.current !== 0 && Date.now() - lastFetchRef.current < CACHE_TTL) {
+      return;
+    }
     setLoading(true);
     try {
       const data = await apiFetch<TemplateListItem[]>("/api/v1/templates");
       setTemplates(data);
+      lastFetchRef.current = Date.now();
     } catch (error) {
       console.error("Failed to fetch templates:", error);
     } finally {
@@ -35,11 +42,15 @@ export function useTemplates() {
     }
   }, []);
 
-  const fetchSharedTemplates = useCallback(async () => {
+  const fetchSharedTemplates = useCallback(async (force = false) => {
+    if (!force && lastSharedFetchRef.current !== 0 && Date.now() - lastSharedFetchRef.current < CACHE_TTL) {
+      return;
+    }
     setSharedLoading(true);
     try {
       const data = await apiFetch<TemplateListItem[]>("/api/v1/templates/shared");
       setSharedTemplates(data);
+      lastSharedFetchRef.current = Date.now();
     } catch (error) {
       console.error("Failed to fetch shared templates:", error);
     } finally {
@@ -68,7 +79,7 @@ export function useTemplates() {
           method: "POST",
           body: JSON.stringify(data),
         });
-        await fetchTemplates();
+        await fetchTemplates(true);
       } catch (error) {
         console.error("Failed to save template:", error);
         throw error;
@@ -81,7 +92,7 @@ export function useTemplates() {
     async (id: string) => {
       try {
         await apiFetch(`/api/v1/templates/${id}`, { method: "DELETE" });
-        await fetchTemplates();
+        await fetchTemplates(true);
       } catch (error) {
         console.error("Failed to delete template:", error);
         throw error;
@@ -94,7 +105,7 @@ export function useTemplates() {
     async (id: string) => {
       try {
         await apiFetch(`/api/v1/templates/${id}/fork`, { method: "POST" });
-        await fetchTemplates();
+        await fetchTemplates(true);
       } catch (error) {
         console.error("Failed to fork template:", error);
         throw error;
@@ -110,7 +121,7 @@ export function useTemplates() {
           method: "PUT",
           body: JSON.stringify({ is_public: isPublic }),
         });
-        await fetchTemplates();
+        await fetchTemplates(true);
       } catch (error) {
         console.error("Failed to update template sharing:", error);
         throw error;
