@@ -133,6 +133,34 @@ export default function ChatWindow({ onOpenDesign, conversationId: propConversat
     }
   };
 
+  const fetchHistory = async (convId: string) => {
+    const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+    const token = getToken();
+    if (!token) return;
+
+    try {
+      const response = await fetch(`${apiBase}/api/v1/conversations/${convId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) return;
+
+      const data = await response.json();
+      const history = (data.messages || []).map(
+        (msg: { id: string; role: string; content: string; created_at: string }) => ({
+          id: msg.id,
+          role: msg.role as "user" | "assistant" | "system",
+          content: msg.content,
+          timestamp: new Date(msg.created_at),
+        })
+      );
+      if (history.length > 0) {
+        setMessages(history);
+      }
+    } catch (error) {
+      console.error("Failed to fetch conversation history:", error);
+    }
+  };
+
   const connectWebSocket = (convId: string) => {
     const wsBase = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8000";
     const token = getToken();
@@ -347,6 +375,7 @@ export default function ChatWindow({ onOpenDesign, conversationId: propConversat
       let convId: string | null;
       if (propConversationId) {
         convId = propConversationId;
+        await fetchHistory(convId);
       } else {
         convId = await createConversation();
       }
