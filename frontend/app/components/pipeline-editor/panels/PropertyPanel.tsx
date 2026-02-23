@@ -3,7 +3,7 @@
 import type { Node } from "reactflow";
 import type { AgentNodeData } from "../nodes/AgentNode";
 import { AVAILABLE_MODELS, AVAILABLE_ROLES, getRoleConfig } from "../utils/nodeDefaults";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 
 interface PropertyPanelProps {
   node: Node<AgentNodeData> | null;
@@ -29,9 +29,34 @@ export default function PropertyPanel({
   const [maxTokens, setMaxTokens] = useState(4096);
   const [retryCount, setRetryCount] = useState(3);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const prevNodeIdRef = useRef<string | null>(null);
+
+  const applyChanges = useCallback(
+    (nodeId: string) => {
+      const effectiveRole = isCustomRole ? customRoleName || "custom" : role;
+      onUpdate(nodeId, {
+        name,
+        role: effectiveRole,
+        llmModel,
+        description,
+        isCustomRole,
+        customPrompt: customPrompt || undefined,
+        temperature,
+        maxTokens,
+        retryCount,
+      });
+    },
+    [name, role, llmModel, description, isCustomRole, customRoleName, customPrompt, temperature, maxTokens, retryCount, onUpdate]
+  );
 
   useEffect(() => {
+    // Auto-apply previous node's changes before switching
+    if (prevNodeIdRef.current && node && prevNodeIdRef.current !== node.id) {
+      applyChanges(prevNodeIdRef.current);
+    }
+
     if (node) {
+      prevNodeIdRef.current = node.id;
       setName(node.data.name);
       setRole(node.data.role);
       setLlmModel(node.data.llmModel);
@@ -42,7 +67,6 @@ export default function PropertyPanel({
       setTemperature(node.data.temperature ?? 0.7);
       setMaxTokens(node.data.maxTokens ?? 4096);
       setRetryCount(node.data.retryCount ?? 3);
-      // Auto-expand if advanced settings are configured
       setShowAdvanced(
         !!(
           node.data.customPrompt ||
@@ -51,24 +75,16 @@ export default function PropertyPanel({
           (node.data.retryCount !== undefined && node.data.retryCount !== 3)
         )
       );
+    } else {
+      prevNodeIdRef.current = null;
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [node]);
 
   if (!node) return null;
 
   const handleApply = () => {
-    const effectiveRole = isCustomRole ? customRoleName || "custom" : role;
-    onUpdate(node.id, {
-      name,
-      role: effectiveRole,
-      llmModel,
-      description,
-      isCustomRole,
-      customPrompt: customPrompt || undefined,
-      temperature,
-      maxTokens,
-      retryCount,
-    });
+    applyChanges(node.id);
   };
 
   const config = getRoleConfig(isCustomRole ? "" : role);
