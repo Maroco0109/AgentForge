@@ -1,5 +1,12 @@
 import { test, expect } from '@playwright/test';
-import { generateTestUser, registerUser, loginUser, authenticatedContext } from './helpers';
+import {
+  generateTestUser,
+  registerUser,
+  loginUser,
+  authenticatedContext,
+  createTemplate,
+  shareTemplate,
+} from './helpers';
 
 test.describe('템플릿 (Templates)', () => {
   test('템플릿 목록 페이지 렌더링', async ({ page, request, browser }) => {
@@ -73,94 +80,64 @@ test.describe('템플릿 (Templates)', () => {
     await context.close();
   });
 
-  test.skip('템플릿 목록에서 템플릿 확인 (백엔드 API 필요)', async ({ page, request, browser }) => {
+  test('템플릿 목록에서 템플릿 확인', async ({ request, browser }) => {
     const user = generateTestUser();
 
     // 사용자 등록 및 로그인
     await registerUser(request, user);
     const token = await loginUser(request, user);
 
+    // API로 템플릿 미리 생성
+    const templateName = `목록 테스트 템플릿 ${Date.now()}`;
+    await createTemplate(request, token, { name: templateName });
+
     // 인증된 컨텍스트로 페이지 열기
     const context = await authenticatedContext(browser, token);
     const authPage = await context.newPage();
-
-    // 먼저 템플릿 생성
-    await authPage.goto('/pipeline-editor');
-    await authPage.waitForSelector('.react-flow', { timeout: 10000 });
-
-    const addButton = authPage.locator('button:has-text("Add"), button:has-text("추가")').first();
-    if (await addButton.isVisible()) {
-      await addButton.click();
-      await authPage.waitForTimeout(1000);
-    }
-
-    const saveAsTemplateButton = authPage.locator('button:has-text("템플릿으로"), button:has-text("Save as Template"), button:has-text("Template")');
-    if (await saveAsTemplateButton.isVisible()) {
-      await saveAsTemplateButton.click();
-      const templateNameInput = authPage.locator('input[name="name"], input[placeholder*="템플릿"], input[placeholder*="Template"]');
-      await templateNameInput.fill('목록 테스트 템플릿');
-      const confirmButton = authPage.locator('button:has-text("저장"), button:has-text("Save"), button[type="submit"]').last();
-      await confirmButton.click();
-      await authPage.waitForSelector('text=/템플릿.*저장|Template.*saved|Success/i', { timeout: 5000 });
-    }
 
     // 템플릿 목록 페이지로 이동
     await authPage.goto('/templates');
 
     // 생성한 템플릿이 목록에 표시되는지 확인
-    await expect(authPage.locator('text=목록 테스트 템플릿')).toBeVisible({ timeout: 10000 });
+    await expect(authPage.locator(`text=${templateName}`)).toBeVisible({ timeout: 10000 });
 
     await context.close();
   });
 
-  test.skip('템플릿 상세 보기 (백엔드 API 필요)', async ({ page, request, browser }) => {
+  test('템플릿 상세 보기', async ({ request, browser }) => {
     const user = generateTestUser();
 
     // 사용자 등록 및 로그인
     await registerUser(request, user);
     const token = await loginUser(request, user);
 
+    // API로 템플릿 미리 생성
+    const templateName = `상세보기 테스트 ${Date.now()}`;
+    const templateDescription = '상세 정보를 확인하는 템플릿';
+    await createTemplate(request, token, {
+      name: templateName,
+      description: templateDescription,
+    });
+
     // 인증된 컨텍스트로 페이지 열기
     const context = await authenticatedContext(browser, token);
     const authPage = await context.newPage();
 
-    // 템플릿 생성
-    await authPage.goto('/pipeline-editor');
-    await authPage.waitForSelector('.react-flow', { timeout: 10000 });
-
-    const addButton = authPage.locator('button:has-text("Add"), button:has-text("추가")').first();
-    if (await addButton.isVisible()) {
-      await addButton.click();
-      await authPage.waitForTimeout(1000);
-    }
-
-    const saveAsTemplateButton = authPage.locator('button:has-text("템플릿으로"), button:has-text("Save as Template"), button:has-text("Template")');
-    if (await saveAsTemplateButton.isVisible()) {
-      await saveAsTemplateButton.click();
-      const templateNameInput = authPage.locator('input[name="name"], input[placeholder*="템플릿"], input[placeholder*="Template"]');
-      await templateNameInput.fill('상세보기 테스트');
-      const descriptionInput = authPage.locator('textarea[name="description"], textarea[placeholder*="설명"], textarea[placeholder*="Description"]');
-      if (await descriptionInput.isVisible()) {
-        await descriptionInput.fill('상세 정보를 확인하는 템플릿');
-      }
-      const confirmButton = authPage.locator('button:has-text("저장"), button:has-text("Save"), button[type="submit"]').last();
-      await confirmButton.click();
-      await authPage.waitForSelector('text=/템플릿.*저장|Template.*saved|Success/i', { timeout: 5000 });
-    }
-
     // 템플릿 목록 페이지로 이동
     await authPage.goto('/templates');
-    await authPage.waitForSelector('text=상세보기 테스트', { timeout: 10000 });
+    await authPage.waitForSelector(`text=${templateName}`, { timeout: 10000 });
 
     // 템플릿 클릭하여 상세 페이지로 이동
-    await authPage.click('text=상세보기 테스트');
+    await authPage.click(`text=${templateName}`);
 
     // 상세 페이지 URL 확인
     await authPage.waitForURL(/\/templates\/[a-f0-9-]+/);
 
     // 템플릿 정보 확인
-    await expect(authPage.locator('h1:has-text("상세보기 테스트"), h2:has-text("상세보기 테스트")')).toBeVisible();
-    await expect(authPage.locator('text=상세 정보를 확인하는 템플릿')).toBeVisible();
+    await expect(
+      authPage.locator(`h1:has-text("${templateName}"), h2:has-text("${templateName}")`)
+    ).toBeVisible();
+    await expect(authPage.locator(`text=${templateDescription}`)).toBeVisible();
 
     // 파이프라인 다이어그램 표시 확인 (React Flow)
     await expect(authPage.locator('.react-flow')).toBeVisible({ timeout: 5000 });
@@ -168,43 +145,28 @@ test.describe('템플릿 (Templates)', () => {
     await context.close();
   });
 
-  test.skip('템플릿 포크 (백엔드 API 필요)', async ({ page, request, browser }) => {
+  test('템플릿 포크', async ({ request, browser }) => {
     const user = generateTestUser();
 
     // 사용자 등록 및 로그인
     await registerUser(request, user);
     const token = await loginUser(request, user);
 
+    // API로 템플릿 생성 후 공개 설정
+    const templateName = `포크 테스트 원본 ${Date.now()}`;
+    const template = await createTemplate(request, token, { name: templateName });
+    await shareTemplate(request, token, template.id);
+
     // 인증된 컨텍스트로 페이지 열기
     const context = await authenticatedContext(browser, token);
     const authPage = await context.newPage();
 
-    // 템플릿 생성
-    await authPage.goto('/pipeline-editor');
-    await authPage.waitForSelector('.react-flow', { timeout: 10000 });
-
-    const addButton = authPage.locator('button:has-text("Add"), button:has-text("추가")').first();
-    if (await addButton.isVisible()) {
-      await addButton.click();
-      await authPage.waitForTimeout(1000);
-    }
-
-    const saveAsTemplateButton = authPage.locator('button:has-text("템플릿으로"), button:has-text("Save as Template"), button:has-text("Template")');
-    if (await saveAsTemplateButton.isVisible()) {
-      await saveAsTemplateButton.click();
-      const templateNameInput = authPage.locator('input[name="name"], input[placeholder*="템플릿"], input[placeholder*="Template"]');
-      await templateNameInput.fill('포크 테스트 원본');
-      const confirmButton = authPage.locator('button:has-text("저장"), button:has-text("Save"), button[type="submit"]').last();
-      await confirmButton.click();
-      await authPage.waitForSelector('text=/템플릿.*저장|Template.*saved|Success/i', { timeout: 5000 });
-    }
-
     // 템플릿 목록 페이지로 이동
     await authPage.goto('/templates');
-    await authPage.waitForSelector('text=포크 테스트 원본', { timeout: 10000 });
+    await authPage.waitForSelector(`text=${templateName}`, { timeout: 10000 });
 
     // 템플릿 클릭하여 상세 페이지로 이동
-    await authPage.click('text=포크 테스트 원본');
+    await authPage.click(`text=${templateName}`);
     await authPage.waitForURL(/\/templates\/[a-f0-9-]+/);
 
     // 포크 버튼 클릭
@@ -227,46 +189,34 @@ test.describe('템플릿 (Templates)', () => {
     await authPage.goto('/templates');
 
     // 복제된 템플릿이 목록에 있는지 확인
-    const forkedTemplate = authPage.locator('text=/포크.*복제|Fork|Clone/i');
+    const forkedTemplate = authPage.locator('text=/포크.*복제|Fork|Clone|fork/i');
     await expect(forkedTemplate.first()).toBeVisible({ timeout: 10000 });
 
     await context.close();
   });
 
-  test.skip('템플릿 검색 (백엔드 API 필요)', async ({ page, request, browser }) => {
+  test('템플릿 검색', async ({ request, browser }) => {
     const user = generateTestUser();
 
     // 사용자 등록 및 로그인
     await registerUser(request, user);
     const token = await loginUser(request, user);
 
+    // API로 여러 템플릿 생성
+    const suffix = Date.now();
+    const templateNames = [
+      `검색테스트A-${suffix}`,
+      `검색테스트B-${suffix}`,
+      `다른템플릿-${suffix}`,
+    ];
+
+    for (const name of templateNames) {
+      await createTemplate(request, token, { name });
+    }
+
     // 인증된 컨텍스트로 페이지 열기
     const context = await authenticatedContext(browser, token);
     const authPage = await context.newPage();
-
-    // 여러 템플릿 생성
-    const templateNames = ['검색테스트A', '검색테스트B', '다른템플릿'];
-
-    for (const name of templateNames) {
-      await authPage.goto('/pipeline-editor');
-      await authPage.waitForSelector('.react-flow', { timeout: 10000 });
-
-      const addButton = authPage.locator('button:has-text("Add"), button:has-text("추가")').first();
-      if (await addButton.isVisible()) {
-        await addButton.click();
-        await authPage.waitForTimeout(500);
-      }
-
-      const saveAsTemplateButton = authPage.locator('button:has-text("템플릿으로"), button:has-text("Save as Template"), button:has-text("Template")');
-      if (await saveAsTemplateButton.isVisible()) {
-        await saveAsTemplateButton.click();
-        const templateNameInput = authPage.locator('input[name="name"], input[placeholder*="템플릿"], input[placeholder*="Template"]');
-        await templateNameInput.fill(name);
-        const confirmButton = authPage.locator('button:has-text("저장"), button:has-text("Save"), button[type="submit"]').last();
-        await confirmButton.click();
-        await authPage.waitForSelector('text=/템플릿.*저장|Template.*saved|Success/i', { timeout: 5000 });
-      }
-    }
 
     // 템플릿 목록 페이지로 이동
     await authPage.goto('/templates');
@@ -276,14 +226,14 @@ test.describe('템플릿 (Templates)', () => {
 
     if (await searchInput.isVisible()) {
       // 검색어 입력
-      await searchInput.fill('검색테스트');
+      await searchInput.fill(`검색테스트`);
 
       // 검색 결과 확인
-      await expect(authPage.locator('text=검색테스트A')).toBeVisible({ timeout: 5000 });
-      await expect(authPage.locator('text=검색테스트B')).toBeVisible({ timeout: 5000 });
+      await expect(authPage.locator(`text=검색테스트A-${suffix}`)).toBeVisible({ timeout: 5000 });
+      await expect(authPage.locator(`text=검색테스트B-${suffix}`)).toBeVisible({ timeout: 5000 });
 
       // 다른 템플릿은 표시되지 않아야 함
-      await expect(authPage.locator('text=다른템플릿')).not.toBeVisible();
+      await expect(authPage.locator(`text=다른템플릿-${suffix}`)).not.toBeVisible();
     }
 
     await context.close();
