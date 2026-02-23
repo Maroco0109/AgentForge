@@ -19,4 +19,6 @@ ENV PYTHONPATH=/app
 
 EXPOSE 8000
 
-CMD ["uvicorn", "backend.gateway.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--ws-max-size", "1048576"]
+COPY backend/entrypoint.sh /app/backend/entrypoint.sh
+RUN chmod +x /app/backend/entrypoint.sh
+ENTRYPOINT ["/app/backend/entrypoint.sh"]
