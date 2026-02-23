@@ -30,9 +30,9 @@ def upgrade() -> None:
         sa.Column("display_name", sa.String(length=100), nullable=False),
         sa.Column(
             "role",
-            sa.Enum("free", "pro", "admin", name="userrole"),
+            sa.Enum("FREE", "PRO", "ADMIN", name="userrole"),
             nullable=False,
-            server_default="free",
+            server_default="FREE",
         ),
         sa.Column(
             "created_at",
@@ -58,9 +58,9 @@ def upgrade() -> None:
         sa.Column("title", sa.String(length=255), nullable=False),
         sa.Column(
             "status",
-            sa.Enum("active", "archived", name="conversationstatus"),
+            sa.Enum("ACTIVE", "ARCHIVED", name="conversationstatus"),
             nullable=False,
-            server_default="active",
+            server_default="ACTIVE",
         ),
         sa.Column(
             "created_at",
@@ -85,7 +85,7 @@ def upgrade() -> None:
         sa.Column("conversation_id", sa.Uuid(), nullable=False),
         sa.Column(
             "role",
-            sa.Enum("user", "assistant", "system", name="messagerole"),
+            sa.Enum("USER", "ASSISTANT", "SYSTEM", name="messagerole"),
             nullable=False,
         ),
         sa.Column("content", sa.Text(), nullable=False),
