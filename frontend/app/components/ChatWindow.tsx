@@ -71,6 +71,8 @@ export default function ChatWindow({ onOpenDesign, conversationId: propConversat
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout>();
   const reconnectAttemptsRef = useRef(0);
+  const shouldReconnectRef = useRef(true);
+  const MAX_RECONNECT_ATTEMPTS = 5;
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -306,11 +308,27 @@ export default function ChatWindow({ onOpenDesign, conversationId: propConversat
       setIsTyping(false);
       wsRef.current = null;
 
+      if (!shouldReconnectRef.current) return;
+
+      if (reconnectAttemptsRef.current >= MAX_RECONNECT_ATTEMPTS) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: crypto.randomUUID(),
+            role: "system",
+            content: "Connection lost. Please refresh the page to reconnect.",
+            timestamp: new Date(),
+          },
+        ]);
+        return;
+      }
+
       // Exponential backoff reconnect
       const backoffDelay = Math.min(30000, 1000 * Math.pow(2, reconnectAttemptsRef.current));
       reconnectAttemptsRef.current += 1;
 
       reconnectTimeoutRef.current = setTimeout(() => {
+        if (!shouldReconnectRef.current) return;
         console.log(`Reconnecting (attempt ${reconnectAttemptsRef.current})...`);
         connectWebSocket(convId);
       }, backoffDelay);
@@ -321,6 +339,9 @@ export default function ChatWindow({ onOpenDesign, conversationId: propConversat
 
   useEffect(() => {
     let cancelled = false;
+
+    shouldReconnectRef.current = true;
+    reconnectAttemptsRef.current = 0;
 
     const init = async () => {
       let convId: string | null;
@@ -338,6 +359,7 @@ export default function ChatWindow({ onOpenDesign, conversationId: propConversat
 
     return () => {
       cancelled = true;
+      shouldReconnectRef.current = false;
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
       }
