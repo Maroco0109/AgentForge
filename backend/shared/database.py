@@ -42,7 +42,12 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
             await session.close()
 
 
-async def init_db() -> None:
-    """Initialize database by creating all tables."""
+async def create_tables() -> None:
+    """Create all tables directly. For testing only - production uses Alembic."""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+
+async def init_db() -> None:
+    """Initialize database. Schema managed by Alembic in production."""
+    pass

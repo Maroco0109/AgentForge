@@ -12,7 +12,7 @@ from backend.shared.middleware import PrometheusMiddleware
 from backend.shared.schemas import HealthResponse
 
 from .rate_limiter import close_redis, init_redis
-from .routes import api_keys, auth, chat, conversations, metrics, pipeline, templates
+from .routes import api_keys, auth, chat, conversations, metrics, pipeline, stats, templates
 
 
 @asynccontextmanager
@@ -53,6 +53,7 @@ app.include_router(conversations.router, prefix="/api/v1", tags=["conversations"
 app.include_router(pipeline.router, prefix="/api/v1", tags=["pipelines"])
 app.include_router(api_keys.router, prefix="/api/v1", tags=["api-keys"])
 app.include_router(templates.router, prefix="/api/v1", tags=["templates"])
+app.include_router(stats.router, prefix="/api/v1", tags=["stats"])
 app.include_router(metrics.router, tags=["metrics"])
 
 
