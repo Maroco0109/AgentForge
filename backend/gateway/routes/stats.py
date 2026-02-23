@@ -90,7 +90,7 @@ async def get_usage_history(
         UsageHistoryItem(
             date=c.date,
             cost=c.total_cost,
-            request_count=msg_counts.get(c.date, 0),
+            request_count=msg_counts.get(str(c.date), 0),
         )
         for c in costs
     ]
