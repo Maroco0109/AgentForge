@@ -78,8 +78,8 @@
 | **캐시** | Redis 7+ |
 | **모니터링** | Prometheus, Grafana |
 | **컨테이너** | Docker Compose |
-| **테스트** | pytest, pytest-asyncio, Playwright |
-| **CI/CD** | GitHub Actions (6 checks) |
+| **테스트** | pytest, pytest-asyncio, Vitest, React Testing Library, Playwright |
+| **CI/CD** | GitHub Actions (7 checks) |
 
 ## 프로젝트 구조
 
@@ -87,11 +87,12 @@
 .
 ├── backend/                      # FastAPI 백엔드
 │   ├── gateway/                  # API Gateway (JWT, RBAC, Rate Limiting, API Key)
-│   │   ├── auth.py               # JWT 인증
+│   │   │   ├── auth.py               # JWT 인증
 │   │   ├── rbac.py               # 역할 기반 접근 제어
 │   │   ├── limiter.py            # Rate Limiting
 │   │   ├── api_key_manager.py    # API 키 관리
-│   │   └── cost_breaker.py       # 비용 Circuit Breaker
+│   │   ├── cost_breaker.py       # 비용 Circuit Breaker
+│   │   └── routes/stats.py       # 사용량 통계 API
 │   ├── discussion/               # Discussion Engine
 │   │   ├── intent_analyzer.py    # 의도 분석
 │   │   ├── design_generator.py   # 설계 생성
@@ -100,8 +101,8 @@
 │   │   ├── graph.py              # StateGraph 정의
 │   │   └── session.py            # 세션 관리
 │   └── shared/                   # 공유 모듈
-│       ├── models.py             # SQLAlchemy 모델
-│       ├── database.py           # DB 세션 팩토리
+│       ├── models.py             # SQLAlchemy 모델 (7개)
+│       ├── database.py           # DB 세션 팩토리 (Alembic 마이그레이션 지원)
 │       ├── schemas.py            # Pydantic 스키마
 │       ├── security.py           # 프롬프트 인젝션 방어
 │       ├── metrics.py            # Prometheus 메트릭
@@ -113,12 +114,18 @@
 │   └── tests/                    # 단위 테스트
 ├── frontend/                     # Next.js 14 App Router
 │   ├── app/                      # App Router
-│   │   ├── page.tsx              # 홈
-│   │   ├── login/                # 로그인 페이지
-│   │   ├── chat/                 # 챗봇 UI
-│   │   └── components/           # React 컴포넌트
-│   │       └── pipeline-editor/  # React Flow 파이프라인 에디터
-│   └── lib/                      # 유틸리티 (API 클라이언트, WebSocket)
+│   │   ├── (auth)/               # 인증 페이지 (login, register)
+│   │   ├── (main)/               # 메인 페이지
+│   │   │   ├── conversations/    # 대화 목록/상세
+│   │   │   ├── dashboard/        # 사용자 대시보드 (사용량 차트, 파이프라인 이력)
+│   │   │   └── templates/        # 템플릿 목록/상세
+│   │   ├── components/           # React 컴포넌트
+│   │   │   ├── ChatWindow.tsx    # WebSocket 채팅
+│   │   │   ├── SplitView.tsx     # 분할 패널
+│   │   │   └── pipeline-editor/  # React Flow 파이프라인 에디터
+│   │   └── page.tsx              # 홈 (SplitView)
+│   ├── lib/                      # 유틸리티 (API, WebSocket, Auth Context)
+│   └── vitest.config.ts          # Vitest 테스트 설정
 ├── tests/                        # 백엔드 통합 테스트
 │   ├── unit/                     # 단위 테스트
 │   │   ├── test_auth.py          # JWT 인증
@@ -135,9 +142,12 @@
 │   └── conftest.py               # pytest 설정
 ├── e2e/                          # Playwright E2E 테스트
 │   ├── tests/                    # 테스트 스크립트
+│   │   ├── helpers.ts            # 공통 헬퍼 (인증, 템플릿 생성 등)
 │   │   ├── auth.spec.ts          # 로그인/회원가입
 │   │   ├── chat.spec.ts          # 챗봇 대화
-│   │   └── pipeline.spec.ts      # 파이프라인 에디터
+│   │   ├── smoke.spec.ts         # 스모크 테스트
+│   │   ├── pipeline-editor.spec.ts # 파이프라인 에디터
+│   │   └── templates.spec.ts     # 템플릿 CRUD
 │   └── playwright.config.ts      # Playwright 설정
 ├── docker/                       # Docker Compose 설정
 │   ├── docker-compose.yml        # 전체 서비스
@@ -158,8 +168,8 @@
 │   ├── phase-07-integration.md   # Phase 7 문서
 │   └── phase-08-react-flow.md    # Phase 8 문서
 ├── .github/workflows/            # CI/CD
-│   ├── test.yml                  # backend-test, backend-lint, frontend-build, frontend-lint
-│   ├── e2e.yml                   # E2E 테스트
+│   ├── test.yml                  # backend-test, backend-lint, frontend-build, frontend-lint, frontend-test
+│   ├── e2e.yml                   # E2E 테스트 (Playwright + Docker)
 │   └── claude-code-review.yml    # AI 코드 리뷰
 ├── .env.example                  # 환경변수 예시
 ├── pyproject.toml                # Python 의존성
@@ -293,6 +303,13 @@ cd ../e2e
 npx playwright test
 ```
 
+### 프론트엔드 단위 테스트
+
+```bash
+cd frontend
+npm test
+```
+
 ### 프론트엔드 빌드 검증
 
 ```bash
@@ -314,7 +331,7 @@ npm run lint
 
 ## CI/CD
 
-모든 PR은 6개 체크를 통과해야 머지 가능합니다:
+모든 PR은 7개 체크를 통과해야 머지 가능합니다:
 
 | 체크 | 워크플로우 | 설명 |
 |------|-----------|------|
@@ -322,6 +339,7 @@ npm run lint
 | **backend-lint** | test.yml | ruff format + check |
 | **frontend-build** | test.yml | Next.js 프로덕션 빌드 |
 | **frontend-lint** | test.yml | ESLint |
+| **frontend-test** | test.yml | Vitest 단위 테스트 (43개) |
 | **e2e** | e2e.yml | Playwright E2E 테스트 (Docker) |
 | **claude-review** | claude-code-review.yml | AI 코드 리뷰 (Claude Sonnet 4.6) |
 
@@ -378,7 +396,7 @@ feat/phase-N-xxx → develop → main
 3. 구현 + 테스트 작성
 4. 커밋 (컨벤션 준수)
 5. PR 생성 (템플릿 사용)
-6. **CI 5개 체크 전부 통과 대기** (backend-test, backend-lint, frontend-build, frontend-lint, e2e)
+6. **CI 7개 체크 전부 통과 대기** (backend-test, backend-lint, frontend-build, frontend-lint, frontend-test, e2e, claude-review)
 7. **claude-review 코멘트 확인 및 수정**
 8. 사용자 리뷰 후 머지
 

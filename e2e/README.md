@@ -64,7 +64,8 @@ e2e/
 ├── playwright.config.ts    # Playwright 설정
 ├── package.json            # 의존성 및 스크립트
 ├── tests/
-│   ├── helpers.ts          # 공통 헬퍼 함수 (인증, 사용자 생성 등)
+│   ├── helpers.ts          # 공통 헬퍼 함수 (인증, 사용자 생성, 템플릿 생성 등)
+│   ├── smoke.spec.ts       # 스모크 테스트 (서비스 가용성)
 │   ├── auth.spec.ts        # 인증 관련 테스트
 │   ├── chat.spec.ts        # 채팅 기능 테스트
 │   ├── pipeline-editor.spec.ts  # 파이프라인 에디터 테스트
@@ -72,7 +73,16 @@ e2e/
 └── README.md
 ```
 
+## 테스트 현황
+
+- **활성 테스트**: 13개
+- **스킵된 테스트**: 6개 (WebSocket/LLM 의존, 저장 다이얼로그 플로우 불일치)
+
 ## 테스트 범위
+
+### smoke.spec.ts
+- 프론트엔드 접속 가능 확인
+- 백엔드 헬스체크 확인
 
 ### auth.spec.ts
 - 회원가입 페이지 렌더링
@@ -114,6 +124,8 @@ e2e/
 - `loginUser(request, user)`: API를 통한 로그인 및 JWT 토큰 반환
 - `authenticatedContext(browser, token)`: JWT 인증된 브라우저 컨텍스트 생성
 - `createConversation(request, token, title)`: API를 통한 대화 생성
+- `createTemplate(request, token, name, description)`: API를 통한 템플릿 생성
+- `shareTemplate(request, token, templateId)`: API를 통한 템플릿 공개 설정
 
 ## CI/CD 통합
 

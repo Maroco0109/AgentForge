@@ -73,6 +73,7 @@ API Gateway 레이어. HTTP/WebSocket 요청 처리, 인증/인가, 속도 제�
 - **routes/pipeline.py**: 파이프라인 실행 (직접 실행, Discussion Engine 경유)
 - **routes/templates.py**: 파이프라인 템플릿 관리 (CRUD, Fork, 공유)
 - **routes/metrics.py**: Prometheus 메트릭 엔드포인트
+- **routes/stats.py**: 사용량 통계 API (사용 이력, 파이프라인 이력)
 
 ### discussion/
 
@@ -175,6 +176,13 @@ LangGraph 기반 파이프라인 실행 엔진. Multi-LLM 라우팅, 에이전�
 |--------|------|------|
 | GET | /metrics | Prometheus 메트릭 |
 
+### Stats
+
+| Method | Path | 설명 |
+|--------|------|------|
+| GET | /stats/usage-history?days=30 | 일별 사용량/비용 이력 |
+| GET | /stats/pipeline-history?limit=20 | 파이프라인 실행 이력 |
+
 ### Health
 
 | Method | Path | 설명 |
@@ -230,6 +238,24 @@ LangGraph 기반 파이프라인 실행 엔진. Multi-LLM 라우팅, 에이전�
 
 - 사용자별 일일 LLM 비용 추적 (UserDailyCost 모델)
 - 일일 한도 초과 시 429 Too Many Requests 반환
+
+## 실행 방법
+
+## 데이터베이스 마이그레이션
+
+Alembic으로 스키마를 관리합니다. Docker 환경에서는 `entrypoint.sh`가 자동으로 `alembic upgrade head`를 실행합니다.
+
+```bash
+# 마이그레이션 실행
+cd backend
+python -m alembic upgrade head
+
+# 마이그레이션 상태 확인
+python -m alembic current
+
+# 새 마이그레이션 생성
+python -m alembic revision -m "description"
+```
 
 ## 실행 방법
 
