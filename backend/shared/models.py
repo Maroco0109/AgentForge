@@ -11,6 +11,7 @@ from sqlalchemy import (
     Enum,
     Float,
     ForeignKey,
+    Integer,
     String,
     Text,
     Uuid,
@@ -46,6 +47,15 @@ class MessageRole(str, enum.Enum):
     USER = "user"
     ASSISTANT = "assistant"
     SYSTEM = "system"
+
+
+class PipelineExecutionStatus(str, enum.Enum):
+    """Pipeline execution status."""
+
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
 
 
 class User(Base):
@@ -187,3 +197,28 @@ class UserDailyCost(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), onupdate=func.now(), nullable=False
     )
+
+
+class PipelineExecution(Base):
+    """Pipeline execution history for dashboard."""
+
+    __tablename__ = "pipeline_executions"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    design_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    status: Mapped[PipelineExecutionStatus] = mapped_column(
+        Enum(PipelineExecutionStatus),
+        default=PipelineExecutionStatus.PENDING,
+        nullable=False,
+    )
+    duration_seconds: Mapped[float | None] = mapped_column(Float, nullable=True)
+    agent_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), nullable=False
+    )
+
+    user: Mapped["User"] = relationship()
