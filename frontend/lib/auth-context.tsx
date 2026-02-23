@@ -57,7 +57,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({ detail: "Login failed" }));
-      throw new Error(error.detail || "Invalid credentials");
+      const detail = error.detail;
+      if (Array.isArray(detail)) {
+        throw new Error(detail.map((d: { msg?: string }) => d.msg || "Validation error").join(", "));
+      }
+      throw new Error(typeof detail === "string" ? detail : "Invalid credentials");
     }
 
     const data = await response.json();
@@ -86,7 +90,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({ detail: "Registration failed" }));
-      throw new Error(error.detail || "Registration failed");
+      const detail = error.detail;
+      if (Array.isArray(detail)) {
+        throw new Error(detail.map((d: { msg?: string }) => d.msg || "Validation error").join(", "));
+      }
+      throw new Error(typeof detail === "string" ? detail : "Registration failed");
     }
 
     router.push("/login");
