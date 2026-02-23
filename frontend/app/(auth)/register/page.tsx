@@ -42,6 +42,8 @@ export default function RegisterPage() {
             name="username"
             type="text"
             required
+            minLength={2}
+            maxLength={100}
             className="w-full bg-gray-800 text-gray-100 border border-gray-700 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent placeholder:text-gray-500"
             placeholder="johndoe"
           />
