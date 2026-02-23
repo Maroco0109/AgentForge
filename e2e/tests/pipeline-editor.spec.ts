@@ -27,7 +27,7 @@ test.describe('파이프라인 에디터 (Pipeline Editor)', () => {
     await context.close();
   });
 
-  test.skip('노드 추가 (사이드바 Add 버튼 필요)', async ({ page, request, browser }) => {
+  test('노드 추가', async ({ page, request, browser }) => {
     const user = generateTestUser();
 
     // 사용자 등록 및 로그인
@@ -46,21 +46,20 @@ test.describe('파이프라인 에디터 (Pipeline Editor)', () => {
     // 초기 노드 수 확인
     const initialNodes = await authPage.locator('.react-flow__node').count();
 
-    // 노드 추가 버튼 클릭 (예: "Add Intent Analyzer" 버튼)
-    const addNodeButton = authPage.locator('button:has-text("Intent"), button:has-text("Analyzer")').first();
+    // Toolbar의 "+ Add Node" 드롭다운 버튼 클릭
+    const addNodeButton = authPage.locator('button:has-text("+ Add Node")');
+    await expect(addNodeButton).toBeVisible({ timeout: 5000 });
+    await addNodeButton.click();
 
-    if (await addNodeButton.isVisible()) {
-      await addNodeButton.click();
+    // 드롭다운이 열리면 첫 번째 항목 클릭 (Collector, Analyzer 등 role 라벨)
+    const dropdownMenu = authPage.locator('div.absolute').filter({ has: authPage.locator('button') }).first();
+    await expect(dropdownMenu).toBeVisible({ timeout: 3000 });
+    await dropdownMenu.locator('button').first().click();
 
-      // 노드가 추가되었는지 확인
-      await authPage.waitForTimeout(1000); // 애니메이션 대기
-      const newNodes = await authPage.locator('.react-flow__node').count();
-      expect(newNodes).toBeGreaterThan(initialNodes);
-    } else {
-      // 대체 방법: 드래그 가능한 노드가 있는지 확인
-      const draggableNode = authPage.locator('[draggable="true"]').first();
-      await expect(draggableNode).toBeVisible();
-    }
+    // 노드가 추가되었는지 확인
+    await authPage.waitForTimeout(1000); // 애니메이션 대기
+    const newNodes = await authPage.locator('.react-flow__node').count();
+    expect(newNodes).toBeGreaterThan(initialNodes);
 
     await context.close();
   });
