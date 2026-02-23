@@ -30,8 +30,8 @@ services:
       - DEBUG=true
       - CORS_ORIGINS=["http://localhost:3000"]
       - DATA_COLLECTOR_URL=http://data-collector:8001
-      - SECRET_KEY=${SECRET_KEY}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - SECRET_KEY=${SECRET_KEY:?SECRET_KEY is required in docker/.env}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - DAILY_COST_LIMIT=${DAILY_COST_LIMIT:-10.0}
     healthcheck:
