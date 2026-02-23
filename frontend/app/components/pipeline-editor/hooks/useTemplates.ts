@@ -27,7 +27,7 @@ export function useTemplates() {
   const CACHE_TTL = 30000; // 30 seconds
 
   const fetchTemplates = useCallback(async (force = false) => {
-    if (!force && Date.now() - lastFetchRef.current < CACHE_TTL && templates.length > 0) {
+    if (!force && lastFetchRef.current !== 0 && Date.now() - lastFetchRef.current < CACHE_TTL) {
       return;
     }
     setLoading(true);
@@ -40,10 +40,10 @@ export function useTemplates() {
     } finally {
       setLoading(false);
     }
-  }, [templates.length]);
+  }, []);
 
   const fetchSharedTemplates = useCallback(async (force = false) => {
-    if (!force && Date.now() - lastSharedFetchRef.current < CACHE_TTL && sharedTemplates.length > 0) {
+    if (!force && lastSharedFetchRef.current !== 0 && Date.now() - lastSharedFetchRef.current < CACHE_TTL) {
       return;
     }
     setSharedLoading(true);
@@ -56,7 +56,7 @@ export function useTemplates() {
     } finally {
       setSharedLoading(false);
     }
-  }, [sharedTemplates.length]);
+  }, []);
 
   const loadTemplate = useCallback(async (id: string): Promise<TemplateDetail | null> => {
     try {

@@ -34,7 +34,7 @@ export async function apiFetch<T>(
     if (response.status === 401 && typeof window !== "undefined") {
       localStorage.removeItem("access_token");
       window.location.href = "/login";
-      throw new Error("Session expired. Redirecting to login...");
+      return undefined as T;
     }
 
     const error = await response.json().catch(() => ({ detail: response.statusText }));

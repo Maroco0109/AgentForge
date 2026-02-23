@@ -1,9 +1,11 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { apiFetch } from "@/lib/api";
 import MessageBubble from "./MessageBubble";
 
 const OPEN_IN_EDITOR_MARKER = "__open_in_editor__";
+const MAX_RECONNECT_ATTEMPTS = 5;
 
 interface ChatWindowProps {
   onOpenDesign?: (design: Record<string, unknown>) => void;
@@ -72,7 +74,6 @@ export default function ChatWindow({ onOpenDesign, conversationId: propConversat
   const reconnectTimeoutRef = useRef<NodeJS.Timeout>();
   const reconnectAttemptsRef = useRef(0);
   const shouldReconnectRef = useRef(true);
-  const MAX_RECONNECT_ATTEMPTS = 5;
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -134,25 +135,16 @@ export default function ChatWindow({ onOpenDesign, conversationId: propConversat
   };
 
   const fetchHistory = async (convId: string) => {
-    const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-    const token = getToken();
-    if (!token) return;
-
     try {
-      const response = await fetch(`${apiBase}/api/v1/conversations/${convId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!response.ok) return;
-
-      const data = await response.json();
-      const history = (data.messages || []).map(
-        (msg: { id: string; role: string; content: string; created_at: string }) => ({
-          id: msg.id,
-          role: msg.role as "user" | "assistant" | "system",
-          content: msg.content,
-          timestamp: new Date(msg.created_at),
-        })
-      );
+      const data = await apiFetch<{
+        messages: Array<{ id: string; role: string; content: string; created_at: string }>;
+      }>(`/api/v1/conversations/${convId}`);
+      const history = (data.messages || []).map((msg) => ({
+        id: msg.id,
+        role: msg.role as "user" | "assistant" | "system",
+        content: msg.content,
+        timestamp: new Date(msg.created_at),
+      }));
       if (history.length > 0) {
         setMessages(history);
       }
