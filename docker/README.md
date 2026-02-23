@@ -151,6 +151,13 @@ sudo chown -R $(whoami) frontend/.next
 docker compose logs backend
 ```
 
+### 데이터베이스 마이그레이션
+백엔드 컨테이너 시작 시 `entrypoint.sh`가 자동으로 `alembic upgrade head`를 실행하여 DB 스키마를 최신 상태로 유지합니다. 수동 실행이 필요한 경우:
+
+```bash
+docker compose exec backend python -m alembic -c /app/backend/alembic.ini upgrade head
+```
+
 ### DB 초기화
 데이터베이스를 완전히 초기화하려면:
 

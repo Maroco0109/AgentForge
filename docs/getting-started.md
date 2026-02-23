@@ -137,7 +137,7 @@ open http://localhost:3000
 브라우저에서 http://localhost:3000 접속 후:
 
 1. "회원가입" 버튼 클릭
-2. 이메일과 비밀번호 입력
+2. 이메일, 표시 이름(display_name), 비밀번호 입력
    - **비밀번호 요구사항**: 8자 이상, 대문자 1개 이상, 숫자 1개 이상
    - 예시: `Password123`
 3. 가입 완료 후 자동 로그인
@@ -207,7 +207,8 @@ curl -X POST http://localhost:8000/api/v1/auth/register \
   -H "Content-Type: application/json" \
   -d '{
     "email": "test@example.com",
-    "password": "Password123"
+    "password": "Password123",
+    "display_name": "테스트유저"
   }'
 ```
 
@@ -215,11 +216,13 @@ curl -X POST http://localhost:8000/api/v1/auth/register \
 ```json
 {
   "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
   "token_type": "bearer",
   "user": {
     "id": "uuid-here",
     "email": "test@example.com",
-    "role": "user"
+    "display_name": "테스트유저",
+    "role": "free"
   }
 }
 ```
@@ -244,7 +247,7 @@ curl -X POST http://localhost:8000/api/v1/auth/login \
 TOKEN="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 
 # 대화 생성
-curl -X POST http://localhost:8000/api/v1/discussions/ \
+curl -X POST http://localhost:8000/api/v1/conversations \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -258,29 +261,28 @@ curl -X POST http://localhost:8000/api/v1/discussions/ \
   "id": "uuid-here",
   "title": "첫 번째 대화",
   "user_id": "user-uuid",
-  "created_at": "2024-01-15T10:30:00Z",
-  "updated_at": "2024-01-15T10:30:00Z"
+  "created_at": "2024-01-15T10:30:00Z"
 }
 ```
 
-### 파이프라인 생성 (인증 필요)
+### 파이프라인 직접 실행 (인증 필요)
 
 ```bash
-curl -X POST http://localhost:8000/api/v1/pipelines/ \
+curl -X POST http://localhost:8000/api/v1/pipelines/execute-direct \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "name": "간단한 분석 파이프라인",
-    "description": "프롬프트 분석 후 설계 생성",
-    "config": {
-      "nodes": [
-        {"id": "1", "type": "analyzer", "config": {}},
-        {"id": "2", "type": "designer", "config": {}}
+    "design": {
+      "design_name": "간단한 분석 파이프라인",
+      "agents": [
+        {"name": "analyzer", "role": "intent_analyzer", "model_hint": "auto"},
+        {"name": "designer", "role": "design_generator", "model_hint": "auto"}
       ],
       "edges": [
-        {"from": "1", "to": "2"}
+        {"from_agent": "analyzer", "to_agent": "designer"}
       ]
-    }
+    },
+    "user_prompt": "Python으로 간단한 웹 크롤러를 만들어줘"
   }'
 ```
 
@@ -511,9 +513,10 @@ docker compose exec redis redis-cli
 AgentForge를 성공적으로 실행했다면:
 
 1. **API 문서 확인**: http://localhost:8000/docs (Swagger UI)
-2. **아키텍처 이해**: `docs/phase-*.md` 문서 읽기
-3. **테스트 실행**: `pytest tests/` 로컬 테스트 실행
-4. **개발 모드**: Phase 8 개발자 고급 모드 활성화
+2. **대시보드 확인**: http://localhost:3000/dashboard (사용량 차트, 파이프라인 이력)
+3. **아키텍처 이해**: `docs/phase-*.md` 문서 읽기
+4. **테스트 실행**: `cd backend && python -m pytest ../tests/ -v` 로컬 테스트 실행
+5. **파이프라인 에디터**: React Flow 기반 시각적 파이프라인 편집기 사용
 
 문제가 발생하면 GitHub Issues에 등록해주세요:
 https://github.com/Maroco0109/AgentForge/issues

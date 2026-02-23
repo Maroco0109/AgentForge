@@ -56,7 +56,7 @@ React Flow 기반 시각적 파이프라인 에디터를 추가하여 사용자�
 
 - React Flow v11 사용 (v12는 React 19 필요, 프로젝트는 React 18.3.1)
 - 동시 편집 미지원 (last-write-wins + `updated_at`)
-- 프론트엔드는 TypeScript 컴파일 + ESLint로 검증 (런타임 테스트 없음)
+- 프론트엔드는 TypeScript 컴파일 + ESLint + Vitest 단위 테스트(43개)로 검증
 
 ## 다음 단계 (Phase 8B)
 
