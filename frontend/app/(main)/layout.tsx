@@ -6,9 +6,10 @@ import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 
 const NAV_ITEMS = [
-  { href: "/conversations", label: "Conversations", icon: "💬" },
-  { href: "/pipeline-editor", label: "Pipeline Editor", icon: "⚡" },
-  { href: "/templates", label: "Templates", icon: "📋" },
+  { href: "/dashboard", label: "Dashboard", icon: "\uD83D\uDCCA" },
+  { href: "/conversations", label: "Conversations", icon: "\uD83D\uDCAC" },
+  { href: "/pipeline-editor", label: "Pipeline Editor", icon: "\u26A1" },
+  { href: "/templates", label: "Templates", icon: "\uD83D\uDCCB" },
 ];
 
 export default function MainLayout({ children }: { children: React.ReactNode }) {
