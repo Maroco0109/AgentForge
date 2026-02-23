@@ -17,17 +17,20 @@ import { useTemplates } from "./hooks/useTemplates";
 import { flowToDesign } from "./utils/flowToDesign";
 import { designToFlow } from "./utils/designToFlow";
 import type { AgentNodeData } from "./nodes/AgentNode";
+import type { PipelineEvent } from "@/app/components/ChatWindow";
 
 import Toolbar from "./panels/Toolbar";
 import PropertyPanel from "./panels/PropertyPanel";
 import TemplateListPanel from "./panels/TemplateListPanel";
+import ProgressIndicator from "./components/ProgressIndicator";
 
 interface PipelineEditorProps {
   onError?: (message: string) => void;
   onEditorReady?: (loadDesign: (design: Record<string, unknown>) => void) => void;
+  externalPipelineEvents?: PipelineEvent[];
 }
 
-export default function PipelineEditor({ onError, onEditorReady }: PipelineEditorProps) {
+export default function PipelineEditor({ onError, onEditorReady, externalPipelineEvents }: PipelineEditorProps) {
   const {
     nodes,
     edges,
@@ -48,6 +51,8 @@ export default function PipelineEditor({ onError, onEditorReady }: PipelineEdito
   const [templateMode, setTemplateMode] = useState<"save" | "load" | null>(
     null
   );
+  const [completedAgents, setCompletedAgents] = useState(0);
+  const [totalAgents, setTotalAgents] = useState(0);
 
   const {
     templates,
@@ -186,6 +191,39 @@ export default function PipelineEditor({ onError, onEditorReady }: PipelineEdito
     });
   }, [loadDesign, onEditorReady]);
 
+  // Process external pipeline events from ChatWindow
+  useEffect(() => {
+    if (!externalPipelineEvents || externalPipelineEvents.length === 0) return;
+
+    const latest = externalPipelineEvents[externalPipelineEvents.length - 1];
+    const nameMap = nodeNameToIdMap();
+
+    switch (latest.type) {
+      case "pipeline_started":
+        setAllNodesStatus("idle");
+        setCompletedAgents(0);
+        setTotalAgents((latest.data.agent_count as number) || nodes.length);
+        break;
+      case "agent_completed": {
+        const agentName = latest.data.agent_name as string;
+        const nodeId = nameMap.get(agentName);
+        if (nodeId) {
+          updateNodeStatus(nodeId, "completed");
+        }
+        setCompletedAgents((prev) => prev + 1);
+        break;
+      }
+      case "pipeline_result":
+        setAllNodesStatus("completed");
+        setCompletedAgents(totalAgents);
+        break;
+      case "pipeline_failed":
+        // Don't set all to failed - some may have completed
+        break;
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [externalPipelineEvents]);
+
   const miniMapNodeColor = useMemo(
     () => (node: Node) => {
       const data = node.data as AgentNodeData;
@@ -265,6 +303,12 @@ export default function PipelineEditor({ onError, onEditorReady }: PipelineEdito
             setSelectedNodeId(null);
           }}
           onClose={() => setSelectedNodeId(null)}
+        />
+
+        <ProgressIndicator
+          completedCount={completedAgents}
+          totalCount={totalAgents}
+          isRunning={isRunning || (completedAgents > 0 && completedAgents < totalAgents)}
         />
       </div>
 

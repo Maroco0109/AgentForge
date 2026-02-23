@@ -7,9 +7,15 @@ import MessageBubble from "./MessageBubble";
 const OPEN_IN_EDITOR_MARKER = "__open_in_editor__";
 const MAX_RECONNECT_ATTEMPTS = 5;
 
+export interface PipelineEvent {
+  type: "pipeline_started" | "agent_completed" | "pipeline_result" | "pipeline_failed";
+  data: Record<string, unknown>;
+}
+
 interface ChatWindowProps {
   onOpenDesign?: (design: Record<string, unknown>) => void;
   conversationId?: string;
+  onPipelineEvent?: (event: PipelineEvent) => void;
 }
 
 interface Message {
@@ -63,7 +69,7 @@ function formatDiscussionMessage(data: Record<string, unknown>): string {
   return content;
 }
 
-export default function ChatWindow({ onOpenDesign, conversationId: propConversationId }: ChatWindowProps) {
+export default function ChatWindow({ onOpenDesign, conversationId: propConversationId, onPipelineEvent }: ChatWindowProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [isConnected, setIsConnected] = useState(false);
@@ -232,6 +238,7 @@ export default function ChatWindow({ onOpenDesign, conversationId: propConversat
           }
 
           case "pipeline_started":
+            onPipelineEvent?.({ type: "pipeline_started", data });
             setMessages((prev) => [
               ...prev,
               {
@@ -244,6 +251,7 @@ export default function ChatWindow({ onOpenDesign, conversationId: propConversat
             break;
 
           case "agent_completed":
+            onPipelineEvent?.({ type: "agent_completed", data });
             setMessages((prev) => [
               ...prev,
               {
@@ -256,6 +264,7 @@ export default function ChatWindow({ onOpenDesign, conversationId: propConversat
             break;
 
           case "pipeline_result": {
+            onPipelineEvent?.({ type: "pipeline_result", data });
             setIsTyping(false);
             const result = data.result || {};
             const output = result.output || data.content || "Pipeline completed.";
@@ -273,6 +282,7 @@ export default function ChatWindow({ onOpenDesign, conversationId: propConversat
           }
 
           case "pipeline_failed":
+            onPipelineEvent?.({ type: "pipeline_failed", data });
             setIsTyping(false);
             setMessages((prev) => [
               ...prev,

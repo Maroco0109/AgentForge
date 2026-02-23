@@ -1,4 +1,4 @@
-import { Browser, APIRequestContext } from '@playwright/test';
+import { expect, Browser, APIRequestContext } from '@playwright/test';
 
 const API_BASE = process.env.API_BASE_URL ?? 'http://localhost:8000';
 
@@ -17,6 +17,17 @@ export interface AuthResponse {
 export interface ConversationResponse {
   id: string;
   title: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TemplateResponse {
+  id: string;
+  name: string;
+  description: string;
+  is_public: boolean;
+  graph_data: Record<string, unknown>;
+  design_data: Record<string, unknown>;
   created_at: string;
   updated_at: string;
 }
@@ -120,4 +131,59 @@ export async function createConversation(
   }
 
   return await response.json();
+}
+
+/**
+ * 파이프라인 템플릿 생성 API 호출
+ */
+export async function createTemplate(
+  request: APIRequestContext,
+  token: string,
+  overrides?: Partial<{
+    name: string;
+    description: string;
+    graph_data: Record<string, unknown>;
+    design_data: Record<string, unknown>;
+  }>
+): Promise<TemplateResponse> {
+  const payload = {
+    name: overrides?.name ?? `Test Template ${Date.now()}`,
+    description: overrides?.description ?? 'Auto-created for E2E test',
+    graph_data: overrides?.graph_data ?? {
+      nodes: [
+        {
+          id: 'node-1',
+          type: 'agent',
+          position: { x: 100, y: 100 },
+          data: { role: 'intent_analyzer', label: 'Intent Analyzer' },
+        },
+      ],
+      edges: [],
+    },
+    design_data: overrides?.design_data ?? {},
+  };
+
+  const resp = await request.post(`${API_BASE}/api/v1/templates`, {
+    headers: { Authorization: `Bearer ${token}` },
+    data: payload,
+  });
+
+  expect(resp.ok()).toBeTruthy();
+  return resp.json();
+}
+
+/**
+ * 템플릿을 공개(public)로 설정하는 API 호출
+ */
+export async function shareTemplate(
+  request: APIRequestContext,
+  token: string,
+  templateId: string
+): Promise<void> {
+  const resp = await request.put(`${API_BASE}/api/v1/templates/${templateId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+    data: { is_public: true },
+  });
+
+  expect(resp.ok()).toBeTruthy();
 }
