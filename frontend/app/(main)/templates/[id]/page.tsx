@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { apiFetch } from "@/lib/api";
@@ -25,11 +25,11 @@ interface TemplateDetail {
 }
 
 interface TemplateDetailPageProps {
-  params: Promise<{ id: string }>;
+  params: { id: string };
 }
 
 export default function TemplateDetailPage({ params }: TemplateDetailPageProps) {
-  const { id } = use(params);
+  const { id } = params;
   const [template, setTemplate] = useState<TemplateDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isForkLoading, setIsForkLoading] = useState(false);
