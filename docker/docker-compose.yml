@@ -51,7 +51,7 @@ services:
     ports:
       - "8001:8001"
     volumes:
-      - ../data-collector:/app
+      - ../data-collector:/src/data_collector
     environment:
       - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/agentforge
       - REDIS_URL=redis://redis:6379
