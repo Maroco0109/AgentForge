@@ -1462,6 +1462,231 @@ curl -X DELETE http://localhost:8000/api/v1/conversations/$CONV_ID \
 
 ---
 
+## 21. 사용자 관점 통합 테스트 시나리오
+
+아래 5개 시나리오는 실제 사용자 입장에서 핵심 플로우를 처음부터 끝까지 검증합니다. 개별 기능 테스트(섹션 1~14)와 달리, 여러 기능을 연결하여 실제 사용 경험을 재현합니다.
+
+---
+
+### 시나리오 1: 신규 가입 → 첫 AI 대화까지
+
+> "처음 AgentForge에 방문한 사용자가 가입하고, 첫 대화를 시작하여 AI 응답을 받는다."
+
+**전제 조건:** Docker 서비스 실행 완료, OpenAI API 키 설정 완료
+
+| 단계 | 사용자 행동 | 기대 결과 |
+|------|------------|-----------|
+| 1 | `http://localhost:3000` 접속 | `/login` 페이지로 리다이렉트 |
+| 2 | "Register" 링크 클릭 → `/register` 이동 | 회원가입 폼 표시 (이메일, 비밀번호, 이름) |
+| 3 | 이메일/비밀번호/이름 입력 후 "Register" 클릭 | `/conversations` 페이지로 자동 이동, "No conversations yet" 표시 |
+| 4 | "Start your first conversation" 버튼 클릭 | `/chat/{uuid}` 페이지로 이동, 채팅 인터페이스 표시 |
+| 5 | "Build me a simple REST API for todo management" 입력 후 Send | 사용자 메시지 우측 표시 → 5~15초 후 AI 응답(설계안) 좌측 표시 |
+| 6 | F12 → Network → WS 탭 확인 | `user_message_received` → `designs_presented` 순서 메시지 확인 |
+
+**테스트 단계:**
+1. 브라우저에서 `http://localhost:3000` 접속
+2. 로그인 페이지에서 하단 "Register" 링크 클릭
+3. 회원가입 폼 작성:
+   - Email: `scenario1@example.com`
+   - Password: `Scenario1Pass123`
+   - Display Name: `Scenario1 User`
+4. "Register" 버튼 클릭 → `/conversations` 자동 이동 확인
+5. "Start your first conversation" 버튼 클릭
+6. 채팅 입력창에 `Build me a simple REST API for todo management` 입력
+7. Send 버튼 클릭
+8. 5~15초 대기 후 AI 설계안 응답 확인
+9. F12 → Application → localStorage에 `access_token` 존재 확인
+
+**검증 포인트:** 가입 → 토큰 발급 → 대화 생성 → WebSocket 연결 → LLM 파이프라인 전체 플로우
+
+---
+
+### 시나리오 2: 파이프라인 설계 → 에디터 편집 → 템플릿 저장 & 공유
+
+> "AI가 제안한 설계안을 파이프라인 에디터에서 편집하고, 저장하여 다른 사용자가 Fork할 수 있도록 공유한다."
+
+**전제 조건:** 시나리오 1 완료 (AI 설계안 응답 수신된 상태)
+
+| 단계 | 사용자 행동 | 기대 결과 |
+|------|------------|-----------|
+| 1 | AI 응답의 "Open in Pipeline Editor" 클릭 | 스플릿 뷰로 에디터 열림, 노드/엣지 시각화 |
+| 2 | 좌측 사이드바에서 새 노드 드래그&드롭 | 캔버스에 노드 추가됨, 입출력 핸들 표시 |
+| 3 | 기존 노드 출력 핸들 → 새 노드 입력 핸들 드래그 | 엣지(연결선) 생성 |
+| 4 | 노드 더블클릭 → 속성 패널에서 이름/설명 수정 | 캔버스 노드 라벨 실시간 반영 |
+| 5 | Save 버튼 클릭 | 성공 토스트 메시지 표시 |
+| 6 | `/templates` 이동 → 저장된 템플릿 카드 확인 | 카드에 이름, 설명, 날짜 표시 |
+| 7 | 카드 클릭 → 상세 → 공개 설정 (API: `PUT is_public=true`) | 템플릿이 공개 상태로 전환 |
+
+**테스트 단계:**
+1. 시나리오 1의 AI 응답에서 "Open in Pipeline Editor" 버튼 클릭
+2. 스플릿 뷰에서 React Flow 캔버스 확인 (노드, 엣지 표시)
+3. 좌측 사이드바에서 노드 타입(예: "Collector") 드래그 → 캔버스 드롭
+4. 새 노드가 추가되는지 확인
+5. 기존 노드의 출력 핸들(우측 원) → 새 노드의 입력 핸들(좌측 원) 드래그
+6. 엣지 연결 확인
+7. 노드 더블클릭 → 우측 PropertyPanel에서 이름 변경
+8. Save 버튼 클릭 → F12 Network에서 `POST /api/v1/templates` 201 확인
+9. 좌측 네비게이션 "Templates" 클릭 → 저장된 템플릿 카드 확인
+10. API로 공개 설정:
+    ```bash
+    curl -X PUT http://localhost:8000/api/v1/templates/{id} \
+      -H "Authorization: Bearer $TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{"is_public": true}'
+    ```
+
+**검증 포인트:** 채팅 → 에디터 연동, 드래그&드롭 UX, 템플릿 CRUD, 공개 설정
+
+---
+
+### 시나리오 3: 대시보드에서 사용량 모니터링
+
+> "여러 대화를 진행한 후, 대시보드에서 사용량 추이와 파이프라인 실행 이력을 확인한다."
+
+**전제 조건:** 로그인 완료, 대화/메시지가 1개 이상 존재
+
+| 단계 | 사용자 행동 | 기대 결과 |
+|------|------------|-----------|
+| 1 | 좌측 사이드바에서 "Dashboard" 클릭 | `/dashboard` 페이지 로드 |
+| 2 | 상단 요약 위젯 확인 | 총 대화 수, 총 메시지 수, 총 비용, 총 파이프라인 수 카드 표시 |
+| 3 | 일별 사용량 차트(LineChart) 확인 | 최근 30일 날짜별 메시지 수 추이 그래프 |
+| 4 | 일별 비용 차트(BarChart) 확인 | 날짜별 LLM 비용 막대 그래프, 호버 시 정확한 금액 툴팁 |
+| 5 | 파이프라인 실행 이력 테이블 확인 | 최근 20건: 이름, 상태(배지 색상), 시간, 에이전트 수 |
+| 6 | 새 대화에서 AI 응답 받은 후 대시보드로 돌아옴 | 메시지 수, 비용 수치 증가 확인 |
+
+**테스트 단계:**
+1. 좌측 사이드바 "Dashboard" 클릭 또는 `http://localhost:3000/dashboard` 접속
+2. 페이지 로드 후 상단 4개 요약 카드 확인:
+   - Conversations 수
+   - Messages 수
+   - Total Cost ($)
+   - Pipeline Executions 수
+3. 사용량 차트(LineChart) 영역 확인 — 날짜 축(X)과 요청 수 축(Y)
+4. 비용 차트(BarChart) 영역 확인 — 막대에 마우스 호버 시 비용 표시
+5. 하단 파이프라인 이력 테이블 확인 — 상태별 색상 배지 (pending=노랑, completed=초록, failed=빨강)
+6. `/conversations` → 새 대화 → 메시지 전송 → 다시 `/dashboard` → 숫자 변화 확인
+
+**API 검증:**
+```bash
+TOKEN="your-access-token"
+
+# 요약 정보
+curl http://localhost:8000/api/v1/stats/summary \
+  -H "Authorization: Bearer $TOKEN" | jq
+
+# 일별 사용량
+curl "http://localhost:8000/api/v1/stats/usage-history?days=30" \
+  -H "Authorization: Bearer $TOKEN" | jq
+
+# 파이프라인 이력
+curl "http://localhost:8000/api/v1/stats/pipeline-history?limit=20" \
+  -H "Authorization: Bearer $TOKEN" | jq
+```
+
+**검증 포인트:** Stats API 3개 엔드포인트, recharts 차트 렌더링, 실시간 데이터 반영
+
+---
+
+### 시나리오 4: 다중 사용자 격리 & 보안
+
+> "두 명의 사용자가 각각 로그인하여 서로의 대화와 템플릿에 접근할 수 없는지 확인한다."
+
+**전제 조건:** Docker 서비스 실행 완료
+
+| 단계 | 사용자 행동 | 기대 결과 |
+|------|------------|-----------|
+| 1 | 브라우저 A: `user1@example.com` 가입 & 로그인 | 대화 목록 비어있음 |
+| 2 | 브라우저 A: 대화 생성 + 메시지 전송 | 대화 1개, 메시지 표시 |
+| 3 | 시크릿 창(브라우저 B): `user2@example.com` 가입 & 로그인 | 대화 목록 비어있음 (user1 대화 안 보임) |
+| 4 | 브라우저 B: user1의 대화 URL 직접 입력 (`/chat/{user1-conv-id}`) | 403 또는 404 응답 (접근 차단) |
+| 5 | 브라우저 A: 로그아웃 (프로필 메뉴 → Logout) | `/login` 리다이렉트, localStorage 토큰 삭제 |
+| 6 | 브라우저 A: `/conversations` 직접 접속 시도 | `/login`으로 리다이렉트 (인증 필요) |
+| 7 | curl로 만료/위조 토큰으로 API 호출 | 401 Unauthorized 응답 |
+
+**테스트 단계:**
+1. **브라우저 A** (일반 창):
+   - `http://localhost:3000/register`에서 `user1@example.com` / `User1Pass123` / `User 1` 가입
+   - "New Conversation" → 메시지 전송 → URL의 대화 ID 기록 (예: `abc-123`)
+2. **브라우저 B** (시크릿 창):
+   - `http://localhost:3000/register`에서 `user2@example.com` / `User2Pass123` / `User 2` 가입
+   - `/conversations` 확인 → user1의 대화가 없는지 확인
+   - 주소창에 `http://localhost:3000/chat/abc-123` (user1의 대화 ID) 직접 입력
+   - 에러 표시 또는 빈 화면 확인 (접근 불가)
+3. **브라우저 A**:
+   - 우측 상단 프로필 아이콘 → "Logout" 클릭
+   - `/login` 리다이렉트 확인
+   - F12 → Application → localStorage에 `access_token` 없는지 확인
+   - 주소창에 `/conversations` 입력 → `/login`으로 리다이렉트
+4. **curl 검증:**
+   ```bash
+   # 위조 토큰
+   curl http://localhost:8000/api/v1/conversations \
+     -H "Authorization: Bearer invalid-token-here"
+   # 기대: 401 Unauthorized
+   ```
+
+**검증 포인트:** JWT 인증, 사용자 데이터 격리(IDOR 방지), 로그아웃, 미인증 접근 차단
+
+---
+
+### 시나리오 5: 템플릿 검색 & Fork → 파이프라인 실행 모니터링
+
+> "공개 템플릿을 검색하고 Fork한 뒤, 파이프라인을 실행하면서 실시간 노드 상태를 모니터링한다."
+
+**전제 조건:** 공개 템플릿 1개 이상 존재 (시나리오 2에서 생성), 로그인 완료
+
+| 단계 | 사용자 행동 | 기대 결과 |
+|------|------------|-----------|
+| 1 | `/templates` 페이지 접속 | 템플릿 목록 표시 (공개 템플릿 포함) |
+| 2 | 검색창에 "REST API" 입력 | 이름에 "REST API" 포함하는 템플릿만 필터링 |
+| 3 | 검색 결과 카드 클릭 → 상세 페이지 | 템플릿 정보 + React Flow 다이어그램 (읽기 전용) 표시 |
+| 4 | "Fork" 버튼 클릭 | 성공 메시지, 복제된 템플릿 생성 (이름에 "(fork)" 포함) |
+| 5 | `/templates`로 이동 → Fork 템플릿 확인 | 목록에 "(fork)" 접미사가 붙은 새 템플릿 표시 |
+| 6 | 채팅에서 파이프라인 실행 요청 | 스플릿 뷰에서 React Flow 노드 상태 변화: idle(회색) → running(파랑) → completed(초록) |
+| 7 | ProgressIndicator 확인 | "2/5 agents completed" 등 진행률 바 표시 |
+
+**테스트 단계:**
+1. `http://localhost:3000/templates` 접속
+2. 검색 입력창에 "REST API" 또는 시나리오 2에서 저장한 템플릿 이름의 일부 입력
+3. 필터링된 결과 확인 → 카드 클릭
+4. 상세 페이지에서:
+   - 템플릿 이름, 설명, 날짜 표시 확인
+   - React Flow 다이어그램 표시 확인 (줌/팬은 가능, 편집 불가)
+5. "Fork" 버튼 클릭 → 성공 메시지 확인
+6. `/templates` 목록에서 "(fork)" 붙은 새 템플릿 확인
+7. 새 대화 생성 → 파이프라인 실행 요청 → 스플릿 뷰 확인:
+   - F12 Network WS 탭에서 `pipeline_started`, `agent_completed`, `pipeline_result` 이벤트 확인
+   - React Flow 노드 색상 변화 관찰 (idle → running → completed/failed)
+   - 상단 ProgressIndicator 진행률 바 표시 확인
+
+**API 검증:**
+```bash
+TOKEN="your-access-token"
+TEMPLATE_ID="target-template-id"
+
+# Fork
+curl -X POST http://localhost:8000/api/v1/templates/$TEMPLATE_ID/fork \
+  -H "Authorization: Bearer $TOKEN" | jq
+
+# 기대: 201 Created, name에 "(fork)" 포함
+```
+
+**검증 포인트:** 검색 필터링, Fork 기능, 파이프라인 실시간 모니터링(이벤트 브릿지), 노드 상태 색상 변화
+
+---
+
+### 시나리오별 커버리지 요약
+
+| 시나리오 | 핵심 기능 | 관련 섹션 |
+|----------|----------|----------|
+| 1. 신규 가입 → 첫 AI 대화 | 인증, 대화, WebSocket, LLM 파이프라인 | 1, 2, 4, 5 |
+| 2. 에디터 편집 → 템플릿 저장 | 파이프라인 에디터, 템플릿 CRUD, 공유 | 6, 7, 8 |
+| 3. 대시보드 모니터링 | Stats API, 차트 렌더링, 실시간 반영 | 12 (신규) |
+| 4. 다중 사용자 격리 | JWT 인증, IDOR 방지, 로그아웃 | 1, 2, 9, 13 |
+| 5. 템플릿 Fork → 실행 모니터링 | 검색, Fork, 실시간 노드 모니터링 | 7, 8, 11 (신규) |
+
+---
+
 **문서 작성일:** 2026-02-23
-**버전:** 1.2
-**마지막 수정:** 2026-02-23 (LLM 통합 테스트 추가, 환경변수 설정 가이드 추가)
+**버전:** 1.3
+**마지막 수정:** 2026-02-23 (사용자 관점 통합 테스트 시나리오 5개 추가)
