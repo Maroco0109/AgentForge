@@ -28,7 +28,7 @@ def upgrade() -> None:
         sa.Column("design_name", sa.String(length=255), nullable=False),
         sa.Column(
             "status",
-            sa.Enum("pending", "running", "completed", "failed", name="pipelineexecutionstatus"),
+            sa.Enum("PENDING", "RUNNING", "COMPLETED", "FAILED", name="pipelineexecutionstatus"),
             nullable=False,
         ),
         sa.Column("duration_seconds", sa.Float(), nullable=True),
