@@ -31,7 +31,7 @@ export default function CostChart({ data }: CostChartProps) {
         <YAxis
           stroke="#9ca3af"
           tick={{ fontSize: 12 }}
-          tickFormatter={(v: number) => `$${v.toFixed(2)}`}
+          tickFormatter={(v) => `$${Number(v).toFixed(2)}`}
         />
         <Tooltip
           contentStyle={{
@@ -40,7 +40,7 @@ export default function CostChart({ data }: CostChartProps) {
             borderRadius: "8px",
           }}
           labelStyle={{ color: "#9ca3af" }}
-          formatter={(value: number) => [`$${value.toFixed(4)}`, "Cost"]}
+          formatter={(value) => [`$${Number(value).toFixed(4)}`, "Cost"]}
         />
         <Bar dataKey="cost" fill="#34d399" radius={[4, 4, 0, 0]} name="Cost" />
       </BarChart>
