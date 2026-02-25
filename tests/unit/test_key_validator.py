@@ -81,8 +81,11 @@ class TestValidateGoogle:
         mock_model.name = "models/gemini-2.0-flash"
         mock_model.supported_generation_methods = ["generateContent"]
 
-        with patch("backend.pipeline.key_validator.genai") as mock_genai:
-            mock_genai.list_models.return_value = [mock_model]
+        mock_client = MagicMock()
+        mock_client.models.list.return_value = [mock_model]
+
+        with patch("backend.pipeline.key_validator.google_genai") as mock_genai:
+            mock_genai.Client.return_value = mock_client
             is_valid, msg, models = await validate_provider_key("google", "AIza-test")
 
         # If GOOGLE provider not available on this branch, expect False (unsupported)
@@ -92,8 +95,11 @@ class TestValidateGoogle:
             assert "unsupported" in msg.lower() or "Unsupported" in msg
 
     async def test_invalid_key(self):
-        with patch("backend.pipeline.key_validator.genai") as mock_genai:
-            mock_genai.list_models.side_effect = Exception("invalid api key")
+        mock_client = MagicMock()
+        mock_client.models.list.side_effect = Exception("invalid api key")
+
+        with patch("backend.pipeline.key_validator.google_genai") as mock_genai:
+            mock_genai.Client.return_value = mock_client
             is_valid, msg, models = await validate_provider_key("google", "bad-key")
 
         assert is_valid is False

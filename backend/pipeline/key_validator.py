@@ -1,5 +1,6 @@
 """Provider-specific API key validation."""
 
+import asyncio
 import logging
 
 from backend.pipeline.llm_router import LLMProvider
@@ -7,9 +8,6 @@ from backend.pipeline.llm_router import LLMProvider
 logger = logging.getLogger(__name__)
 
 # Module-level imports for patchability in tests.
-# These are imported at module load time; if a package is missing,
-# the validator for that provider will fail at runtime (not import time)
-# because the actual calls happen inside the validator functions.
 try:
     from openai import AsyncOpenAI
 except ImportError:  # pragma: no cover
@@ -21,9 +19,9 @@ except ImportError:  # pragma: no cover
     AsyncAnthropic = None  # type: ignore[assignment,misc]
 
 try:
-    from google import generativeai as genai
+    from google import genai as google_genai
 except ImportError:  # pragma: no cover
-    genai = None  # type: ignore[assignment]
+    google_genai = None  # type: ignore[assignment]
 
 # Include GOOGLE if available on this branch (Phase 8-2 adds it)
 _GOOGLE: LLMProvider | None = None
@@ -31,6 +29,9 @@ try:
     _GOOGLE = LLMProvider("google")
 except ValueError:
     pass
+
+# Validation timeout (seconds)
+_VALIDATION_TIMEOUT = 15.0
 
 
 async def validate_provider_key(
@@ -60,7 +61,10 @@ async def validate_provider_key(
         return False, f"Unsupported provider: {provider.value}", []
 
     try:
-        return await validator(api_key)
+        return await asyncio.wait_for(validator(api_key), timeout=_VALIDATION_TIMEOUT)
+    except asyncio.TimeoutError:
+        logger.warning(f"Key validation timed out for {provider.value}")
+        return False, "Validation timed out", []
     except Exception as e:
         logger.warning(f"Key validation failed for {provider.value}: {e}")
         return False, f"Validation failed: {e}", []
@@ -92,7 +96,11 @@ async def _validate_anthropic(api_key: str) -> tuple[bool, str, list[str]]:
         return (
             True,
             "Anthropic key is valid",
-            ["claude-haiku-4-5-20251001", "claude-sonnet-4-5-20250929", "claude-opus-4-6"],
+            [
+                "claude-haiku-4-5-20251001",
+                "claude-sonnet-4-6",
+                "claude-opus-4-6",
+            ],
         )
     except Exception as e:
         error_str = str(e).lower()
@@ -102,13 +110,30 @@ async def _validate_anthropic(api_key: str) -> tuple[bool, str, list[str]]:
 
 
 async def _validate_google(api_key: str) -> tuple[bool, str, list[str]]:
-    """Validate Google Gemini API key by listing models."""
-    genai.configure(api_key=api_key)
+    """Validate Google Gemini API key using instance-based client.
+
+    Uses google.genai.Client for per-request isolation
+    (avoids global genai.configure() race condition).
+    """
+    client = google_genai.Client(api_key=api_key)
     try:
         models = []
-        for model in genai.list_models():
-            if "generateContent" in (model.supported_generation_methods or []):
-                models.append(model.name)
+        async for model in await asyncio.to_thread(client.models.list):
+            name = getattr(model, "name", "")
+            methods = getattr(model, "supported_generation_methods", []) or []
+            if "generateContent" in methods:
+                models.append(name)
+            if len(models) >= 20:
+                break
+        return True, "Google Gemini key is valid", models
+    except TypeError:
+        # client.models.list() may return a sync iterable
+        models = []
+        for model in await asyncio.to_thread(lambda: list(client.models.list())):
+            name = getattr(model, "name", "")
+            methods = getattr(model, "supported_generation_methods", []) or []
+            if "generateContent" in methods:
+                models.append(name)
             if len(models) >= 20:
                 break
         return True, "Google Gemini key is valid", models
