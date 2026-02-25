@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from backend.pipeline.llm_router import (
     AnthropicClient,
+    GeminiClient,
     LLMProvider,
     LLMResponse,
     LLMRouter,
@@ -220,6 +221,7 @@ class TestLLMRouter:
         """Test getting available client when no provider is configured."""
         mock_settings.OPENAI_API_KEY = None
         mock_settings.ANTHROPIC_API_KEY = None
+        mock_settings.GOOGLE_API_KEY = ""
 
         with pytest.raises(RuntimeError, match="No LLM provider is configured"):
             self.router._get_available_client()
@@ -403,3 +405,69 @@ class TestAnthropicClient:
             call_kwargs = mock_anthropic_instance.messages.create.call_args.kwargs
             assert "system" not in call_kwargs
             assert response.content == "Response"
+
+
+class TestGeminiClient:
+    """Test GeminiClient."""
+
+    @patch("backend.pipeline.llm_router.settings")
+    def test_is_available_with_key(self, mock_settings):
+        """Test is_available returns True when API key is set."""
+        mock_settings.GOOGLE_API_KEY = "test-key"
+        client = GeminiClient()
+        assert client.is_available() is True
+
+    @patch("backend.pipeline.llm_router.settings")
+    def test_is_available_without_key(self, mock_settings):
+        """Test is_available returns False when API key is not set."""
+        mock_settings.GOOGLE_API_KEY = ""
+        client = GeminiClient()
+        assert client.is_available() is False
+
+    def test_is_available_with_injected_key(self):
+        """Test is_available with injected API key."""
+        client = GeminiClient(api_key="test-key")
+        assert client.is_available() is True
+
+
+class TestLLMRouterUserKeys:
+    """Test LLMRouter with user_keys (BYOK mode)."""
+
+    def test_user_keys_creates_only_specified_clients(self):
+        """Test that user_keys mode only creates clients for specified providers."""
+        router = LLMRouter(user_keys={LLMProvider.OPENAI: "sk-test"})
+        assert LLMProvider.OPENAI in router._clients
+        assert LLMProvider.ANTHROPIC not in router._clients
+        assert LLMProvider.GOOGLE not in router._clients
+
+    def test_user_keys_multiple_providers(self):
+        """Test user_keys with multiple providers."""
+        router = LLMRouter(
+            user_keys={
+                LLMProvider.OPENAI: "sk-test",
+                LLMProvider.ANTHROPIC: "sk-ant-test",
+            }
+        )
+        assert LLMProvider.OPENAI in router._clients
+        assert LLMProvider.ANTHROPIC in router._clients
+        assert LLMProvider.GOOGLE not in router._clients
+
+    def test_user_keys_clients_are_available(self):
+        """Test that user_keys clients report as available."""
+        router = LLMRouter(user_keys={LLMProvider.OPENAI: "sk-test"})
+        provider, client = router._get_available_client()
+        assert provider == LLMProvider.OPENAI
+        assert client.is_available()
+
+    def test_user_keys_no_provider_raises(self):
+        """Test that user_keys with no providers raises RuntimeError."""
+        router = LLMRouter(user_keys={})
+        with pytest.raises(RuntimeError, match="No LLM provider"):
+            router._get_available_client()
+
+    def test_legacy_mode_backward_compatible(self):
+        """Test that LLMRouter() without args still works."""
+        router = LLMRouter()
+        assert LLMProvider.OPENAI in router._clients
+        assert LLMProvider.ANTHROPIC in router._clients
+        assert LLMProvider.GOOGLE in router._clients

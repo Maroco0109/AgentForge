@@ -22,6 +22,7 @@ class LLMProvider(str, enum.Enum):
 
     OPENAI = "openai"
     ANTHROPIC = "anthropic"
+    GOOGLE = "google"
 
 
 class TaskComplexity(str, enum.Enum):
@@ -59,14 +60,17 @@ MODEL_REGISTRY: dict[TaskComplexity, list[ModelConfig]] = {
     TaskComplexity.SIMPLE: [
         ModelConfig(LLMProvider.OPENAI, "gpt-4o-mini", 0.15, 0.60, 4096),
         ModelConfig(LLMProvider.ANTHROPIC, "claude-haiku-4-5-20251001", 0.25, 1.25, 4096),
+        ModelConfig(LLMProvider.GOOGLE, "gemini-2.0-flash", 0.10, 0.40, 4096),
     ],
     TaskComplexity.STANDARD: [
         ModelConfig(LLMProvider.OPENAI, "gpt-4o", 2.50, 10.00, 4096),
         ModelConfig(LLMProvider.ANTHROPIC, "claude-sonnet-4-5-20250929", 3.00, 15.00, 4096),
+        ModelConfig(LLMProvider.GOOGLE, "gemini-2.5-pro", 1.25, 10.00, 4096),
     ],
     TaskComplexity.COMPLEX: [
         ModelConfig(LLMProvider.OPENAI, "gpt-4o", 2.50, 10.00, 4096),
         ModelConfig(LLMProvider.ANTHROPIC, "claude-opus-4-6", 15.00, 75.00, 4096),
+        ModelConfig(LLMProvider.GOOGLE, "gemini-2.5-pro", 1.25, 10.00, 4096),
     ],
 }
 
@@ -94,18 +98,19 @@ class BaseLLMClient(ABC):
 class OpenAIClient(BaseLLMClient):
     """OpenAI API client."""
 
-    def __init__(self):
+    def __init__(self, api_key: str | None = None):
         self._client = None
+        self._api_key = api_key
 
     def _get_client(self):
         if self._client is None:
             from openai import AsyncOpenAI
 
-            self._client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+            self._client = AsyncOpenAI(api_key=self._api_key or settings.OPENAI_API_KEY)
         return self._client
 
     def is_available(self) -> bool:
-        return bool(settings.OPENAI_API_KEY)
+        return bool(self._api_key or settings.OPENAI_API_KEY)
 
     async def generate(
         self,
@@ -138,18 +143,19 @@ class OpenAIClient(BaseLLMClient):
 class AnthropicClient(BaseLLMClient):
     """Anthropic API client."""
 
-    def __init__(self):
+    def __init__(self, api_key: str | None = None):
         self._client = None
+        self._api_key = api_key
 
     def _get_client(self):
         if self._client is None:
             from anthropic import AsyncAnthropic
 
-            self._client = AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
+            self._client = AsyncAnthropic(api_key=self._api_key or settings.ANTHROPIC_API_KEY)
         return self._client
 
     def is_available(self) -> bool:
-        return bool(settings.ANTHROPIC_API_KEY)
+        return bool(self._api_key or settings.ANTHROPIC_API_KEY)
 
     async def generate(
         self,
@@ -192,14 +198,95 @@ class AnthropicClient(BaseLLMClient):
         )
 
 
+class GeminiClient(BaseLLMClient):
+    """Google Gemini API client."""
+
+    def __init__(self, api_key: str | None = None):
+        self._client = None
+        self._api_key = api_key
+
+    def _get_client(self):
+        if self._client is None:
+            from google import generativeai as genai
+
+            genai.configure(api_key=self._api_key or settings.GOOGLE_API_KEY)
+            self._client = genai
+        return self._client
+
+    def is_available(self) -> bool:
+        return bool(self._api_key or getattr(settings, "GOOGLE_API_KEY", ""))
+
+    async def generate(
+        self,
+        messages: list[dict],
+        model: str,
+        max_tokens: int = 4096,
+        temperature: float = 0.7,
+    ) -> LLMResponse:
+        client = self._get_client()
+        # Convert messages to Gemini format
+        system_instruction = None
+        gemini_contents = []
+        for msg in messages:
+            if msg["role"] == "system":
+                system_instruction = msg["content"]
+            elif msg["role"] == "assistant":
+                gemini_contents.append({"role": "model", "parts": [msg["content"]]})
+            else:
+                gemini_contents.append({"role": "user", "parts": [msg["content"]]})
+
+        gen_config = {
+            "max_output_tokens": max_tokens,
+            "temperature": temperature,
+        }
+
+        model_obj = client.GenerativeModel(
+            model_name=model,
+            system_instruction=system_instruction,
+            generation_config=gen_config,
+        )
+        response = await model_obj.generate_content_async(gemini_contents)
+
+        # Extract usage from response metadata
+        usage_meta = getattr(response, "usage_metadata", None)
+        prompt_tokens = getattr(usage_meta, "prompt_token_count", 0) if usage_meta else 0
+        completion_tokens = getattr(usage_meta, "candidates_token_count", 0) if usage_meta else 0
+
+        return LLMResponse(
+            content=response.text or "",
+            model=model,
+            provider=LLMProvider.GOOGLE.value,
+            usage={
+                "prompt_tokens": prompt_tokens,
+                "completion_tokens": completion_tokens,
+                "total_tokens": prompt_tokens + completion_tokens,
+            },
+            cost_estimate=0.0,
+        )
+
+
 class LLMRouter:
     """Routes requests to appropriate LLM based on task complexity."""
 
-    def __init__(self):
-        self._clients: dict[LLMProvider, BaseLLMClient] = {
-            LLMProvider.OPENAI: OpenAIClient(),
-            LLMProvider.ANTHROPIC: AnthropicClient(),
-        }
+    def __init__(self, user_keys: dict[LLMProvider, str] | None = None):
+        if user_keys:
+            # BYOK mode: only create clients for provided keys
+            self._clients: dict[LLMProvider, BaseLLMClient] = {}
+            client_map = {
+                LLMProvider.OPENAI: OpenAIClient,
+                LLMProvider.ANTHROPIC: AnthropicClient,
+                LLMProvider.GOOGLE: GeminiClient,
+            }
+            for provider, api_key in user_keys.items():
+                if provider in client_map:
+                    self._clients[provider] = client_map[provider](api_key=api_key)
+        else:
+            # Legacy mode: use environment variable keys
+            self._clients = {
+                LLMProvider.OPENAI: OpenAIClient(),
+                LLMProvider.ANTHROPIC: AnthropicClient(),
+                LLMProvider.GOOGLE: GeminiClient(),
+            }
 
     def classify_complexity(self, prompt: str) -> TaskComplexity:
         """Classify task complexity based on prompt characteristics."""
