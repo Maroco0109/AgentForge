@@ -213,7 +213,9 @@ class GeminiClient(BaseLLMClient):
         if self._client is None:
             from google import genai
 
-            self._client = genai.Client(api_key=self._api_key or settings.GOOGLE_API_KEY)
+            self._client = genai.Client(
+                api_key=self._api_key or getattr(settings, "GOOGLE_API_KEY", "")
+            )
         return self._client
 
     def is_available(self) -> bool:
@@ -281,7 +283,7 @@ class LLMRouter:
     """Routes requests to appropriate LLM based on task complexity."""
 
     def __init__(self, user_keys: dict[LLMProvider, str] | None = None):
-        if user_keys:
+        if user_keys is not None:
             # BYOK mode: only create clients for provided keys
             self._clients: dict[LLMProvider, BaseLLMClient] = {}
             client_map = {
