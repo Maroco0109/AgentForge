@@ -22,6 +22,7 @@ from ..auth import (
     require_role,
     verify_password,
 )
+from ..auth_rate_limiter import check_auth_rate_limit
 from ..cost_tracker import get_daily_cost
 from ..rbac import get_permission, is_unlimited
 
@@ -91,7 +92,12 @@ class UpdateRoleRequest(BaseModel):
     role: UserRole
 
 
-@router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/register",
+    response_model=TokenResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(check_auth_rate_limit)],
+)
 async def register(request: RegisterRequest, db: AsyncSession = Depends(get_db)):
     """Register a new user."""
     # Check if email already exists
@@ -121,7 +127,11 @@ async def register(request: RegisterRequest, db: AsyncSession = Depends(get_db))
     return TokenResponse(access_token=access_token, refresh_token=refresh_token)
 
 
-@router.post("/login", response_model=TokenResponse)
+@router.post(
+    "/login",
+    response_model=TokenResponse,
+    dependencies=[Depends(check_auth_rate_limit)],
+)
 async def login(request: LoginRequest, db: AsyncSession = Depends(get_db)):
     """Login and get tokens."""
     result = await db.execute(select(User).where(User.email == request.email))
@@ -147,7 +157,11 @@ async def login(request: LoginRequest, db: AsyncSession = Depends(get_db)):
     return TokenResponse(access_token=access_token, refresh_token=refresh_token)
 
 
-@router.post("/refresh", response_model=TokenResponse)
+@router.post(
+    "/refresh",
+    response_model=TokenResponse,
+    dependencies=[Depends(check_auth_rate_limit)],
+)
 async def refresh_token(request: RefreshRequest, db: AsyncSession = Depends(get_db)):
     """Refresh access token."""
     payload = decode_token(request.refresh_token)

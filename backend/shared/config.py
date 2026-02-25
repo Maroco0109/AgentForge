@@ -1,7 +1,7 @@
 """Application configuration using Pydantic Settings."""
 
 from pydantic import model_validator
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -12,6 +12,9 @@ class Settings(BaseSettings):
     SECRET_KEY: str = ""
     CORS_ORIGINS: list[str] = ["http://localhost:3000"]
     DEBUG: bool = True
+    TRUSTED_PROXY_COUNT: int = 0
+    AUTH_RATE_LIMIT: int = 5
+    AUTH_RATE_WINDOW_SECONDS: int = 900
 
     # Auth settings
     JWT_ALGORITHM: str = "HS256"
@@ -41,11 +44,7 @@ class Settings(BaseSettings):
                 raise ValueError("SECRET_KEY must be set in production")
         return self
 
-    class Config:
-        """Pydantic config."""
-
-        env_file = ".env"
-        env_file_encoding = "utf-8"
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
 
 settings = Settings()
