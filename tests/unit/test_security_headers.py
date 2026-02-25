@@ -37,7 +37,7 @@ async def test_x_content_type_options_header(client):
 async def test_x_xss_protection_header(client):
     """X-XSS-Protection should be set."""
     response = await client.get("/api/v1/health")
-    assert response.headers["x-xss-protection"] == "1; mode=block"
+    assert response.headers["x-xss-protection"] == "0"
 
 
 @pytest.mark.anyio
