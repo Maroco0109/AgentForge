@@ -33,6 +33,8 @@ services:
       - SECRET_KEY=${SECRET_KEY:-dev-only-secret-change-in-production}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:?ENCRYPTION_KEY is required - generate with: python -c "import secrets,base64;print(base64.urlsafe_b64encode(secrets.token_bytes(32)).decode())"}
       - DAILY_COST_LIMIT=${DAILY_COST_LIMIT:-10.0}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
