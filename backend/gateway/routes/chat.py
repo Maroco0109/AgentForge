@@ -189,7 +189,9 @@ async def _process_discussion_response(
         try:
             async with AsyncSessionLocal() as session:
                 user_router = await get_user_router(user_id, session)
-        except ValueError:
+        except Exception as e:
+            if not isinstance(e, ValueError):
+                logger.exception("Failed to get user LLM router")
             await manager.send_personal_message(
                 json.dumps(
                     {

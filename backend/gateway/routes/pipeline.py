@@ -95,12 +95,12 @@ async def _execute_pipeline_core(
     try:
         async with AsyncSessionLocal() as session:
             user_router = await get_user_router(user_id_str, session)
-    except ValueError as e:
+    except ValueError:
         del _pipeline_runs[pipeline_id]
         await release_pipeline_lock(user_id_str)
         raise HTTPException(
             status_code=400,
-            detail=str(e),
+            detail="LLM API key is not configured. Please register a key in settings.",
         )
 
     orchestrator = PipelineOrchestrator(router=user_router)

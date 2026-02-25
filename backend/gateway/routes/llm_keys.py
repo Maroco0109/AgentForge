@@ -45,7 +45,11 @@ async def register_llm_key(
         )
 
     # Validate the key
-    is_valid, message, models = await validate_provider_key(request.provider, request.api_key)
+    try:
+        is_valid, message, models = await validate_provider_key(request.provider, request.api_key)
+    except Exception as e:
+        logger.warning("Key validation error during registration: %s", e)
+        is_valid, message, models = False, "Key validation failed. Please try again.", []
 
     # Encrypt the key
     encrypted_key, nonce = encrypt_api_key(request.api_key)
