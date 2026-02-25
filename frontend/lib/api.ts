@@ -27,7 +27,8 @@ async function tryRefresh(): Promise<string | null> {
     const tokens = await refreshToken(refresh);
     saveTokens(tokens);
     return tokens.access_token;
-  } catch {
+  } catch (err) {
+    console.warn("[apiFetch] Token refresh failed:", err);
     return null;
   }
 }
