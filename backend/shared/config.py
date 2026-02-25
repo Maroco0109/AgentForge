@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     SECRET_KEY: str = ""
     CORS_ORIGINS: list[str] = ["http://localhost:3000"]
     DEBUG: bool = True
+    TRUSTED_PROXY_COUNT: int = 0
 
     # Auth settings
     JWT_ALGORITHM: str = "HS256"
