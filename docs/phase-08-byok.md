@@ -89,17 +89,28 @@ The LLM Router selects the best available provider based on your registered keys
 ### OpenAI
 - Key format: `sk-...` or `sk-proj-...`
 - Validation: calls `client.models.list()`
-- Models: GPT-4o, GPT-4o-mini, GPT-3.5-turbo
+- Models: gpt-4o, gpt-4o-mini
 
 ### Anthropic
 - Key format: `sk-ant-...`
 - Validation: sends minimal message to Claude Haiku (max_tokens=1)
-- Models: Claude 3.5 Sonnet, Claude 3 Haiku
+- Models: claude-haiku-4-5-20251001, claude-sonnet-4-5-20250929, claude-opus-4-6
 
 ### Google Gemini
 - Key format: `AIza...`
 - Validation: calls `client.models.list()`
-- Models: Gemini 2.0 Flash, Gemini 2.5 Pro
+- Models: gemini-2.0-flash, gemini-2.5-pro
+
+## Key Rotation Warning
+
+Changing the `ENCRYPTION_KEY` environment variable will make all existing encrypted keys
+unrecoverable. Users will need to re-register their API keys after a key rotation.
+
+If you must rotate the encryption key:
+1. Notify users to re-register keys after rotation
+2. Update `ENCRYPTION_KEY` in environment
+3. Restart services — existing keys will show as invalid
+4. Users re-register keys from Settings page
 
 ## Implementation Phases
 
