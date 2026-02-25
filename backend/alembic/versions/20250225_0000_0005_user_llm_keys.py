@@ -27,7 +27,7 @@ def upgrade() -> None:
         sa.Column("user_id", sa.Uuid(), nullable=False),
         sa.Column(
             "provider",
-            sa.Enum("OPENAI", "ANTHROPIC", "GOOGLE", name="llmprovidertype"),
+            sa.Enum("openai", "anthropic", "google", name="llmprovidertype"),
             nullable=False,
         ),
         sa.Column("encrypted_key", sa.LargeBinary(), nullable=False),
