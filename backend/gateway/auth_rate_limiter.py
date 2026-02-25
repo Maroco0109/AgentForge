@@ -10,8 +10,8 @@ from .rate_limiter import check_rate_limit, get_redis
 
 logger = logging.getLogger(__name__)
 
-AUTH_RATE_LIMIT = 5
-AUTH_RATE_WINDOW_SECONDS = 900  # 15 minutes
+AUTH_RATE_LIMIT = settings.AUTH_RATE_LIMIT
+AUTH_RATE_WINDOW_SECONDS = settings.AUTH_RATE_WINDOW_SECONDS
 
 
 def _get_client_ip(request: Request) -> str:

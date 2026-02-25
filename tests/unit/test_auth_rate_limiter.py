@@ -5,8 +5,6 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from backend.gateway.auth_rate_limiter import (
-    AUTH_RATE_LIMIT,
-    AUTH_RATE_WINDOW_SECONDS,
     _get_client_ip,
     check_auth_rate_limit,
 )
@@ -123,7 +121,9 @@ class TestCheckAuthRateLimit:
         request = self._make_request()
         await check_auth_rate_limit(request)
 
-    def test_constants(self):
-        """Verify rate limit constants."""
-        assert AUTH_RATE_LIMIT == 5
-        assert AUTH_RATE_WINDOW_SECONDS == 900
+    def test_defaults(self):
+        """Verify default rate limit values from settings."""
+        from backend.shared.config import settings
+
+        assert settings.AUTH_RATE_LIMIT == 5
+        assert settings.AUTH_RATE_WINDOW_SECONDS == 900

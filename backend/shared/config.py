@@ -13,6 +13,8 @@ class Settings(BaseSettings):
     CORS_ORIGINS: list[str] = ["http://localhost:3000"]
     DEBUG: bool = True
     TRUSTED_PROXY_COUNT: int = 0
+    AUTH_RATE_LIMIT: int = 5
+    AUTH_RATE_WINDOW_SECONDS: int = 900
 
     # Auth settings
     JWT_ALGORITHM: str = "HS256"
