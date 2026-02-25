@@ -53,6 +53,8 @@ jobs:
 
       - name: Start services with Docker Compose
         run: cd docker && docker compose up -d --build
+        env:
+          AUTH_RATE_LIMIT: 1000
 
       - name: Wait for services
         run: |
