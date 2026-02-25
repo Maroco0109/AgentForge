@@ -199,7 +199,11 @@ class AnthropicClient(BaseLLMClient):
 
 
 class GeminiClient(BaseLLMClient):
-    """Google Gemini API client."""
+    """Google Gemini API client.
+
+    Uses google.genai.Client for per-instance API key isolation
+    (avoids global genai.configure() race condition in multi-user BYOK).
+    """
 
     def __init__(self, api_key: str | None = None):
         self._client = None
@@ -207,10 +211,9 @@ class GeminiClient(BaseLLMClient):
 
     def _get_client(self):
         if self._client is None:
-            from google import generativeai as genai
+            from google import genai
 
-            genai.configure(api_key=self._api_key or settings.GOOGLE_API_KEY)
-            self._client = genai
+            self._client = genai.Client(api_key=self._api_key or settings.GOOGLE_API_KEY)
         return self._client
 
     def is_available(self) -> bool:
@@ -231,29 +234,37 @@ class GeminiClient(BaseLLMClient):
             if msg["role"] == "system":
                 system_instruction = msg["content"]
             elif msg["role"] == "assistant":
-                gemini_contents.append({"role": "model", "parts": [msg["content"]]})
+                gemini_contents.append({"role": "model", "parts": [{"text": msg["content"]}]})
             else:
-                gemini_contents.append({"role": "user", "parts": [msg["content"]]})
+                gemini_contents.append({"role": "user", "parts": [{"text": msg["content"]}]})
 
-        gen_config = {
-            "max_output_tokens": max_tokens,
-            "temperature": temperature,
-        }
+        from google.genai import types
 
-        model_obj = client.GenerativeModel(
-            model_name=model,
+        config = types.GenerateContentConfig(
             system_instruction=system_instruction,
-            generation_config=gen_config,
+            max_output_tokens=max_tokens,
+            temperature=temperature,
         )
-        response = await model_obj.generate_content_async(gemini_contents)
+
+        response = await client.aio.models.generate_content(
+            model=model,
+            contents=gemini_contents,
+            config=config,
+        )
 
         # Extract usage from response metadata
         usage_meta = getattr(response, "usage_metadata", None)
         prompt_tokens = getattr(usage_meta, "prompt_token_count", 0) if usage_meta else 0
         completion_tokens = getattr(usage_meta, "candidates_token_count", 0) if usage_meta else 0
 
+        # Safe text extraction (handles safety filter blocks)
+        try:
+            content = response.text or ""
+        except ValueError:
+            content = ""
+
         return LLMResponse(
-            content=response.text or "",
+            content=content,
             model=model,
             provider=LLMProvider.GOOGLE.value,
             usage={
