@@ -30,10 +30,7 @@ class UserResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        """Pydantic config."""
-
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 
 # Conversation schemas
@@ -53,10 +50,7 @@ class ConversationResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        """Pydantic config."""
-
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 
 class ConversationDetailResponse(ConversationResponse):
@@ -64,10 +58,7 @@ class ConversationDetailResponse(ConversationResponse):
 
     messages: list["MessageResponse"]
 
-    class Config:
-        """Pydantic config."""
-
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 
 # Message schemas
@@ -90,10 +81,7 @@ class MessageResponse(BaseModel):
     metadata_: dict | None
     created_at: datetime
 
-    class Config:
-        """Pydantic config."""
-
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 
 # WebSocket schemas
@@ -123,10 +111,7 @@ class APIKeyResponse(BaseModel):
     last_used_at: datetime | None
     created_at: datetime
 
-    class Config:
-        """Pydantic config."""
-
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 
 class APIKeyCreateResponse(APIKeyResponse):
@@ -215,10 +200,7 @@ class TemplateResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        """Pydantic config."""
-
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 
 class TemplateListResponse(BaseModel):
@@ -231,10 +213,7 @@ class TemplateListResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        """Pydantic config."""
-
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 
 # LLM Key schemas (BYOK)
@@ -258,10 +237,7 @@ class LLMKeyResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        """Pydantic config."""
-
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 
 class LLMKeyValidationResponse(BaseModel):

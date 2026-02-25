@@ -1,6 +1,6 @@
 """Data Collector configuration."""
 
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class CollectorSettings(BaseSettings):
@@ -12,9 +12,7 @@ class CollectorSettings(BaseSettings):
     MAX_COLLECTION_SIZE_MB: int = 100
     PII_DETECTION_ENABLED: bool = True
 
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
 
 collector_settings = CollectorSettings()
