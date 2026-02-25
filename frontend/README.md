@@ -17,6 +17,7 @@ AgentForge 멀티 에이전트 플랫폼의 프론트엔드 애플리케이션�
 - **app/(main)/templates/page.tsx**: 템플릿 목록/검색
 - **app/(main)/templates/[id]/page.tsx**: 템플릿 상세/포크
 - **app/(main)/dashboard/page.tsx**: 사용자 대시보드 (사용량 차트, 비용 차트, 파이프라인 이력)
+- **app/(main)/settings/page.tsx**: BYOK 설정 페이지 (LLM API 키 관리)
 
 ## 주요 컴포넌트
 
@@ -53,6 +54,18 @@ AgentForge 멀티 에이전트 플랫폼의 프론트엔드 애플리케이션�
 - **dashboard/components/UsageChart.tsx**: 일별 사용량 LineChart (recharts)
 - **dashboard/components/CostChart.tsx**: 일별 비용 BarChart (recharts)
 - **dashboard/components/PipelineHistory.tsx**: 파이프라인 실행 이력 테이블
+
+### Settings (BYOK)
+
+- **settings/page.tsx**: BYOK API 키 관리 메인 페이지
+  - 3개 Provider 카드 (OpenAI / Anthropic / Google Gemini)
+  - 키 등록 다이얼로그 (검증 + 암호화 저장)
+  - 키 삭제/재검증 액션
+- **settings/components/ProviderCard.tsx**: Provider별 상태 카드
+  - 등록 상태 (등록됨/미등록)
+  - 키 프리픽스 표시 (sk-proj-Ab...)
+  - 검증 상태 배지 (Valid/Invalid)
+  - Validate/Delete 버튼 (race condition 방지)
 
 ### 커스텀 훅
 
@@ -111,6 +124,7 @@ REST API fetch wrapper
 - JWT Bearer 토큰 자동 주입 (Authorization 헤더)
 - 에러 핸들링
 - JSON 응답 파싱
+- LLM 키 관리 API: `listLLMKeys()`, `registerLLMKey()`, `deleteLLMKey()`, `validateLLMKey()`
 
 ### lib/auth-context.tsx
 인증 컨텍스트 (React Context)
@@ -201,6 +215,10 @@ frontend/
 │   │   ├── dashboard/               # 사용자 대시보드
 │   │   │   ├── page.tsx             # 대시보드 메인
 │   │   │   └── components/          # UsageChart, CostChart, PipelineHistory
+│   │   ├── settings/                # BYOK 설정
+│   │   │   ├── page.tsx             # 키 관리 메인
+│   │   │   └── components/
+│   │   │       └── ProviderCard.tsx  # Provider 카드
 │   │   └── templates/               # 템플릿 목록/상세/포크
 │   ├── components/
 │   │   ├── ChatWindow.tsx           # WebSocket 채팅
@@ -225,7 +243,7 @@ frontend/
 │   │           ├── flowToDesign.ts        # Flow → Design
 │   │           └── nodeDefaults.ts        # 노드 기본값
 │   ├── globals.css                  # Tailwind 전역 스타일
-│   ├── layout.tsx                   # 루트 레이아웃
+│   ├── layout.tsx                   # 루트 레이아웃 (Settings 네비게이션 포함)
 │   └── page.tsx                     # 루트 페이지
 ├── lib/
 │   ├── websocket.ts                 # WebSocket 클라이언트

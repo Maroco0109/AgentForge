@@ -128,6 +128,19 @@ NEXT_PUBLIC_WS_URL=ws://localhost:8000
 ```env
 OPENAI_API_KEY=sk-...
 ANTHROPIC_API_KEY=sk-ant-...
+GOOGLE_API_KEY=AIza...           # Google Gemini (BYOK 또는 환경변수)
+```
+
+> **BYOK 모드**: 사용자가 Settings 페이지에서 직접 API 키를 등록하면 환경변수 키 대신 사용자 키가 사용됩니다.
+
+### BYOK Encryption
+```env
+ENCRYPTION_KEY=your_base64_encoded_32byte_key  # BYOK 키 암호화용
+```
+
+ENCRYPTION_KEY 생성:
+```bash
+python -c "import secrets, base64; print(base64.urlsafe_b64encode(secrets.token_bytes(32)).decode())"
 ```
 
 ### Cost Limit
@@ -188,4 +201,5 @@ docker compose -f docker-compose.prod.yml up -d --build
 - [ ] CORS_ORIGINS 프로덕션 도메인 추가
 - [ ] 리소스 제한 확인 (메모리/CPU)
 - [ ] 로그 로테이션 설정 확인
+- [ ] ENCRYPTION_KEY 설정 (BYOK 사용 시 필수)
 - [ ] SSL/TLS 인증서 설정 (리버스 프록시 사용 권장)

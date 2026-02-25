@@ -28,10 +28,12 @@ AgentForge는 사용자 프롬프트 기반 멀티 에이전트 플랫폼입니�
    docker compose version
    ```
 
-2. **OpenAI API 키** (권장)
-   - https://platform.openai.com/api-keys 에서 발급
-   - LLM 기능을 사용하려면 필수입니다
-   - Anthropic Claude API도 지원하지만 OpenAI가 더 안정적입니다
+2. **LLM API 키** (BYOK 모드)
+   - AgentForge는 BYOK(Bring Your Own Key) 모드를 지원합니다
+   - OpenAI: https://platform.openai.com/api-keys
+   - Anthropic: https://console.anthropic.com/settings/keys
+   - Google Gemini: https://aistudio.google.com/apikey
+   - 환경변수에 설정하거나, 웹 UI의 Settings 페이지에서 등록할 수 있습니다
 
 ---
 
@@ -102,6 +104,9 @@ OPENAI_API_KEY=sk-proj-your-actual-key-here
 
 # 권장: 프로덕션 환경에서는 SECRET_KEY 변경
 SECRET_KEY=$(openssl rand -hex 32)
+
+# BYOK 암호화 키 (API 키 등록 시 필수)
+ENCRYPTION_KEY=$(python -c "import secrets, base64; print(base64.urlsafe_b64encode(secrets.token_bytes(32)).decode())")
 ```
 
 ### 2. Docker 컨테이너 시작
@@ -174,6 +179,16 @@ open http://localhost:3000
 4. 노드 연결 (드래그 앤 드롭)
 5. "실행" 버튼으로 파이프라인 시작
 6. 각 노드의 실행 결과를 실시간으로 확인
+
+### 5. BYOK API 키 등록
+
+자신의 LLM API 키를 등록하여 파이프라인을 실행할 수 있습니다:
+
+1. 좌측 사이드바에서 **Settings** 클릭
+2. Provider 카드에서 **Add Key** 클릭 (OpenAI / Anthropic / Google)
+3. API 키 입력 후 등록
+4. 자동 검증 → 상태 배지 표시 (Valid / Invalid)
+5. 최소 1개의 유효한 키가 등록되면 파이프라인 실행 가능
 
 ---
 
@@ -517,6 +532,7 @@ AgentForge를 성공적으로 실행했다면:
 3. **아키텍처 이해**: `docs/phase-*.md` 문서 읽기
 4. **테스트 실행**: `cd backend && python -m pytest ../tests/ -v` 로컬 테스트 실행
 5. **파이프라인 에디터**: React Flow 기반 시각적 파이프라인 편집기 사용
+6. **BYOK 설정**: Settings 페이지에서 LLM API 키 등록 (http://localhost:3000/settings)
 
 문제가 발생하면 GitHub Issues에 등록해주세요:
 https://github.com/Maroco0109/AgentForge/issues

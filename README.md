@@ -10,7 +10,7 @@
 ## 핵심 차별점
 
 1. **심층 토론 기반 설계**: Intent Analyzer → Design Generator → Critique Agent의 3단계 토론 프로세스로 요구사항을 정제하고 최적의 파이프라인을 설계합니다.
-2. **Multi-LLM 라우팅 (비용 60-70% 절감)**: 작업 복잡도에 따라 GPT-4o, GPT-4o-mini, Claude Sonnet을 자동 선택하여 성능과 비용을 최적화합니다.
+2. **BYOK Multi-LLM 라우팅 (비용 60-70% 절감)**: 사용자가 직접 등록한 API 키로 GPT-4o, Claude Sonnet, Gemini Pro를 자동 선택하여 성능과 비용을 최적화합니다.
 3. **데이터 수집 적법성 자동 검증**: robots.txt 준수, IP 기반 SSRF 방어, DNS rebinding 방어를 내장한 독립 마이크로서비스로 크롤링 위험을 최소화합니다.
 4. **한국어 네이티브 지원**: Intent Analyzer부터 UI까지 전 계층이 한국어를 우선 지원합니다.
 
@@ -21,6 +21,7 @@
 │                          Frontend (Next.js 14)                          │
 │  ┌─────────────┐  ┌──────────────┐  ┌─────────────────────────────┐    │
 │  │   Chat UI   │  │ Auth UI      │  │ React Flow Pipeline Editor │    │
+│  │             │  │              │  │ Settings (BYOK)             │    │
 │  └─────────────┘  └──────────────┘  └─────────────────────────────┘    │
 └─────────────────────────────────────────────────────────────────────────┘
                                  │
@@ -30,6 +31,7 @@
 │  ┌──────────────┐  ┌───────────────┐  ┌─────────────────────────┐     │
 │  │ JWT Auth     │  │ RBAC          │  │ Rate Limiting           │     │
 │  │ API Key Mgmt │  │ Cost Breaker  │  │ Prometheus Metrics      │     │
+│  │ BYOK Key Mgmt│  │               │  │                         │     │
 │  └──────────────┘  └───────────────┘  └─────────────────────────┘     │
 └─────────────────────────────────────────────────────────────────────────┘
                                  │
@@ -39,6 +41,8 @@
 │  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐     │
 │  │ Intent Analyzer  │→ │ Design Generator │→ │ Critique Agent   │     │
 │  │ (Multi-LLM)      │  │ (Multi-LLM)      │  │ (Multi-LLM)      │     │
+│  │ OpenAI/Anthropic/│  │                  │  │                  │     │
+│  │ Google Gemini    │  │                  │  │                  │     │
 │  └──────────────────┘  └──────────────────┘  └──────────────────┘     │
 └─────────────────────────────────────────────────────────────────────────┘
                                  │
@@ -73,7 +77,7 @@
 | **Backend** | FastAPI, Python 3.11+ |
 | **인증/인가** | JWT, bcrypt, RBAC, API Key 관리, Cost Circuit Breaker |
 | **에이전트** | LangGraph |
-| **LLM** | OpenAI (GPT-4o, GPT-4o-mini) + Anthropic (Claude Sonnet) Multi-LLM Router |
+| **LLM** | OpenAI (GPT-4o, GPT-4o-mini) + Anthropic (Claude Sonnet/Haiku) + Google Gemini (Flash/Pro) — BYOK Multi-LLM Router |
 | **데이터베이스** | PostgreSQL 16+, SQLAlchemy (async), Alembic (마이그레이션) |
 | **캐시** | Redis 7+ |
 | **모니터링** | Prometheus, Grafana |
@@ -92,19 +96,23 @@
 │   │   ├── limiter.py            # Rate Limiting
 │   │   ├── api_key_manager.py    # API 키 관리
 │   │   ├── cost_breaker.py       # 비용 Circuit Breaker
-│   │   └── routes/stats.py       # 사용량 통계 API
+│   │   ├── routes/stats.py       # 사용량 통계 API
+│   │   └── routes/llm_keys.py     # BYOK LLM 키 관리 (CRUD + 검증)
 │   ├── discussion/               # Discussion Engine
 │   │   ├── intent_analyzer.py    # 의도 분석
 │   │   ├── design_generator.py   # 설계 생성
 │   │   └── critique_agent.py     # 비평 에이전트
 │   ├── pipeline/                 # Pipeline Orchestrator (LangGraph)
 │   │   ├── graph.py              # StateGraph 정의
-│   │   └── session.py            # 세션 관리
+│   │   ├── session.py            # 세션 관리
+│   │   ├── user_router_factory.py  # 사용자별 LLM Router 팩토리 (TTL 캐시)
+│   │   └── key_validator.py        # Provider별 API 키 검증
 │   └── shared/                   # 공유 모듈
-│       ├── models.py             # SQLAlchemy 모델 (7개)
+│       ├── models.py             # SQLAlchemy 모델 (8개 + UserLLMKey)
 │       ├── database.py           # DB 세션 팩토리 (Alembic 마이그레이션 지원)
 │       ├── schemas.py            # Pydantic 스키마
 │       ├── security.py           # 프롬프트 인젝션 방어
+│       ├── encryption.py       # AES-256-GCM 암호화/복호화
 │       ├── metrics.py            # Prometheus 메트릭
 │       └── middleware.py         # 미들웨어 (메트릭 수집)
 ├── data-collector/               # 독립 마이크로서비스
@@ -118,6 +126,7 @@
 │   │   ├── (main)/               # 메인 페이지
 │   │   │   ├── conversations/    # 대화 목록/상세
 │   │   │   ├── dashboard/        # 사용자 대시보드 (사용량 차트, 파이프라인 이력)
+│   │   │   ├── settings/       # BYOK API 키 관리 (Settings)
 │   │   │   └── templates/        # 템플릿 목록/상세
 │   │   ├── components/           # React 컴포넌트
 │   │   │   ├── ChatWindow.tsx    # WebSocket 채팅
@@ -166,7 +175,8 @@
 │   ├── phase-05-pipeline.md      # Phase 5 문서
 │   ├── phase-06-collector.md     # Phase 6 문서
 │   ├── phase-07-integration.md   # Phase 7 문서
-│   └── phase-08-react-flow.md    # Phase 8 문서
+│   ├── phase-08-react-flow.md    # Phase 8 문서
+│   └── phase-08-byok.md          # Phase 8 BYOK 문서
 ├── .github/workflows/            # CI/CD
 │   ├── test.yml                  # backend-test, backend-lint, frontend-build, frontend-lint, frontend-test
 │   ├── e2e.yml                   # E2E 테스트 (Playwright + Docker)
@@ -191,6 +201,7 @@
 | **Phase 6** | ✅ 완료 | Data Collector 마이크로서비스 (robots.txt, SSRF 방어, 적법성 검증) |
 | **Phase 7** | ✅ 완료 | 서비스 연동 + E2E 통합 (SessionManager, CollectorNode, 프론트엔드 메시지 라우팅) |
 | **Phase 8** | ✅ 완료 | React Flow 파이프라인 에디터 (노드 기반 시각적 파이프라인 편집) |
+| **Phase 8 BYOK** | ✅ 완료 | BYOK 멀티테넌트 전환 (AES-256-GCM 암호화, 사용자별 LLM Router, 3 Provider 지원) |
 | **Monitoring** | ✅ 완료 | Prometheus + Grafana (9개 패널: HTTP, LLM, Pipeline, WebSocket 메트릭) |
 | **LLM 통합 테스트** | ✅ 완료 | OpenAI/Anthropic 실제 API 호출 검증 |
 | **E2E CI** | ✅ 완료 | Playwright 기반 E2E 테스트 자동화 |
@@ -214,6 +225,10 @@ cd AgentForge
 cp .env.example .env
 # .env 파일에서 SECRET_KEY, OPENAI_API_KEY, ANTHROPIC_API_KEY 설정
 
+# BYOK 암호화 키 생성 (API 키 등록 시 필수)
+python -c "import secrets, base64; print(base64.urlsafe_b64encode(secrets.token_bytes(32)).decode())"
+# 생성된 키를 .env의 ENCRYPTION_KEY에 설정
+
 # Docker Compose로 전체 서비스 실행
 cd docker
 docker compose up -d
@@ -236,8 +251,10 @@ docker compose up -d
 | 변수명 | 설명 | 기본값 |
 |--------|------|--------|
 | `SECRET_KEY` | JWT 서명 키 (필수, 프로덕션) | - |
-| `OPENAI_API_KEY` | OpenAI API 키 (필수) | - |
-| `ANTHROPIC_API_KEY` | Anthropic API 키 (필수) | - |
+| `OPENAI_API_KEY` | OpenAI API 키 (BYOK 또는 환경변수) | - |
+| `ANTHROPIC_API_KEY` | Anthropic API 키 (BYOK 또는 환경변수) | - |
+| `ENCRYPTION_KEY` | BYOK 키 암호화용 AES-256 키 (BYOK 사용 시 필수) | - |
+| `GOOGLE_API_KEY` | Google Gemini API 키 (선택) | - |
 | `DATABASE_URL` | PostgreSQL 연결 문자열 | postgresql+asyncpg://... |
 | `REDIS_URL` | Redis 연결 문자열 | redis://localhost:6379 |
 | `NEXT_PUBLIC_API_URL` | 프론트엔드에서 사용할 API URL | http://localhost:8000 |

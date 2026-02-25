@@ -38,6 +38,8 @@ AgentForge 멀티 에이전트 플랫폼의 FastAPI 백엔드입니다. API Gate
                                   │    - synthesizer     │
                                   │    - reporter        │
                                   │    - custom          │
+                                  │  - user_router_factory │
+                                  │  - key_validator       │
                                   └──────────────────────┘
         │                                    │
         └─────────────┬──────────────────────┘
@@ -51,6 +53,7 @@ AgentForge 멀티 에이전트 플랫폼의 FastAPI 백엔드입니다. API Gate
               │   - security    │
               │   - metrics     │
               │   - middleware  │
+              │   - encryption  │
               └─────────────────┘
 ```
 
@@ -74,6 +77,7 @@ API Gateway 레이어. HTTP/WebSocket 요청 처리, 인증/인가, 속도 제�
 - **routes/templates.py**: 파이프라인 템플릿 관리 (CRUD, Fork, 공유)
 - **routes/metrics.py**: Prometheus 메트릭 엔드포인트
 - **routes/stats.py**: 사용량 통계 API (사용 이력, 파이프라인 이력)
+- **routes/llm_keys.py**: BYOK LLM API 키 관리 (등록/조회/삭제/재검증, AES-256-GCM 암호화)
 
 ### discussion/
 
@@ -92,7 +96,7 @@ LangGraph 기반 파이프라인 실행 엔진. Multi-LLM 라우팅, 에이전�
 
 - **orchestrator.py**: LangGraph 실행, 상태 스트리밍, 결과 집계
 - **graph_builder.py**: DesignProposal을 LangGraph로 변환
-- **llm_router.py**: Multi-LLM 라우팅 (SIMPLE→mini, STANDARD→sonnet, COMPLEX→opus)
+- **llm_router.py**: Multi-LLM 라우팅 (OpenAI/Anthropic/Gemini, BYOK user_keys 주입 지원)
 - **state.py**: TypedDict + Annotated + operator.add를 사용한 reducer 패턴
 - **agents/base.py**: BaseAgentNode 추상 클래스 (재시도 로직, 프롬프트 인젝션 검사)
 - **agents/analyzer.py**: 분석 에이전트 (사용자 요청 분해)
@@ -101,6 +105,8 @@ LangGraph 기반 파이프라인 실행 엔진. Multi-LLM 라우팅, 에이전�
 - **agents/synthesizer.py**: 종합 에이전트 (결과 통합)
 - **agents/reporter.py**: 보고 에이전트 (최종 리포트 생성)
 - **agents/custom.py**: 사용자 정의 에이전트 (프롬프트 기반 임의 에이전트)
+- **user_router_factory.py**: 사용자별 LLM Router 팩토리 (TTL 5분 캐시, 최대 200개)
+- **key_validator.py**: Provider별 API 키 검증 (OpenAI: models.list, Anthropic: messages.create, Google: models.list)
 
 ### shared/
 
@@ -108,11 +114,12 @@ LangGraph 기반 파이프라인 실행 엔진. Multi-LLM 라우팅, 에이전�
 
 - **config.py**: 환경변수 설정 (Pydantic BaseSettings)
 - **database.py**: SQLAlchemy async 세션 관리
-- **models.py**: 7개 ORM 모델 (User, Conversation, Message, APIKey, PipelineExecution, PipelineTemplate, UserDailyCost)
+- **models.py**: 8개 ORM 모델 (User, Conversation, Message, APIKey, PipelineExecution, PipelineTemplate, UserDailyCost, UserLLMKey)
 - **schemas.py**: Pydantic 스키마 (Request/Response 검증)
 - **security.py**: 2-Layer 프롬프트 인젝션 방어 (InputSanitizer + PromptIsolator)
 - **metrics.py**: Prometheus 메트릭 정의 (요청 수, 레이턴시, 에러율, LLM 비용)
 - **middleware.py**: HTTP 계측 미들웨어 (자동 메트릭 수집)
+- **encryption.py**: AES-256-GCM 암호화/복호화 (BYOK API 키 보호, per-key random nonce)
 
 ## API 엔드포인트
 
@@ -157,6 +164,15 @@ LangGraph 기반 파이프라인 실행 엔진. Multi-LLM 라우팅, 에이전�
 | POST | /api-keys | API 키 생성 |
 | GET | /api-keys | 내 API 키 목록 조회 |
 | DELETE | /api-keys/{key_id} | API 키 삭제 |
+
+### LLM Keys (BYOK)
+
+| Method | Path | 설명 |
+|--------|------|------|
+| POST | /llm-keys | BYOK LLM 키 등록 (암호화 + 검증 + upsert) |
+| GET | /llm-keys | 등록된 LLM 키 목록 (마스킹) |
+| DELETE | /llm-keys/{key_id} | LLM 키 삭제 |
+| POST | /llm-keys/{key_id}/validate | LLM 키 재검증 |
 
 ### Templates
 
@@ -206,6 +222,8 @@ LangGraph 기반 파이프라인 실행 엔진. Multi-LLM 라우팅, 에이전�
 | DEFAULT_LLM_PROVIDER | 기본 LLM 제공자 | anthropic |
 | DEFAULT_LLM_MODEL | 기본 LLM 모델 | claude-3-5-sonnet-20241022 |
 | DATA_COLLECTOR_URL | Data Collector 서비스 URL | http://data-collector:8001 |
+| ENCRYPTION_KEY | BYOK API 키 암호화용 AES-256 키 | - |
+| GOOGLE_API_KEY | Google Gemini API 키 | - |
 
 ## 보안
 
@@ -233,6 +251,14 @@ LangGraph 기반 파이프라인 실행 엔진. Multi-LLM 라우팅, 에이전�
 
 - 파이프라인 실행 시 Redis lock으로 동시성 제어
 - 비용 추적 시 Redis pipeline으로 원자성 보장
+
+### BYOK (Bring Your Own Key)
+
+- **암호화**: AES-256-GCM + per-key random nonce로 API 키 암호화 저장
+- **최소 노출**: 복호화는 파이프라인 실행 시에만, API 응답/로그에 평문 키 없음
+- **키 프리픽스**: 첫 12자만 표시용으로 저장 (key_prefix)
+- **TTL 캐시**: 5분 TTL, 최대 200개 — 메모리 내 키 수명 제한
+- **캐시 무효화**: 키 CRUD 시 즉시 캐시 무효화
 
 ### 비용 Circuit Breaker
 
