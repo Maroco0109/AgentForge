@@ -70,7 +70,7 @@ export async function apiFetch<T>(
     // Handle 401 Unauthorized with token refresh
     if (response.status === 401 && typeof window !== "undefined") {
       // Don't try to refresh if we're already on the refresh endpoint (infinite loop prevention)
-      if (path.includes("/auth/refresh")) {
+      if (path.endsWith("/auth/refresh")) {
         clearTokens();
         window.location.href = "/login";
         return undefined as T;
