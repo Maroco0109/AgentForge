@@ -10,6 +10,7 @@ const NAV_ITEMS = [
   { href: "/conversations", label: "Conversations", icon: "\uD83D\uDCAC" },
   { href: "/pipeline-editor", label: "Pipeline Editor", icon: "\u26A1" },
   { href: "/templates", label: "Templates", icon: "\uD83D\uDCCB" },
+  { href: "/settings", label: "Settings", icon: "\u2699\uFE0F" },
 ];
 
 export default function MainLayout({ children }: { children: React.ReactNode }) {
