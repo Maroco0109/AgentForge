@@ -10,9 +10,6 @@ from .rate_limiter import check_rate_limit, get_redis
 
 logger = logging.getLogger(__name__)
 
-AUTH_RATE_LIMIT = settings.AUTH_RATE_LIMIT
-AUTH_RATE_WINDOW_SECONDS = settings.AUTH_RATE_WINDOW_SECONDS
-
 
 def _get_client_ip(request: Request) -> str:
     """Extract client IP using TRUSTED_PROXY_COUNT for safety.
@@ -20,6 +17,9 @@ def _get_client_ip(request: Request) -> str:
     When TRUSTED_PROXY_COUNT == 0 (default, no proxy): use request.client.host directly.
     When TRUSTED_PROXY_COUNT > 0 (behind proxy): extract the Nth IP from the right
     of X-Forwarded-For, since rightmost entries are added by trusted proxies.
+
+    Note: When using a reverse proxy, ensure it overwrites (not appends to)
+    the X-Forwarded-For header to prevent client-side spoofing.
     """
     proxy_count = settings.TRUSTED_PROXY_COUNT
     if proxy_count <= 0:
@@ -48,12 +48,15 @@ async def check_auth_rate_limit(request: Request) -> None:
     if redis is None:
         return
 
+    rate_limit = settings.AUTH_RATE_LIMIT
+    window_seconds = settings.AUTH_RATE_WINDOW_SECONDS
+
     client_ip = _get_client_ip(request)
-    key = f"auth_rate_limit:{client_ip}:{AUTH_RATE_WINDOW_SECONDS}s"
+    key = f"auth_rate_limit:{client_ip}:{window_seconds}s"
 
     try:
         allowed, remaining, retry_after = await check_rate_limit(
-            redis, key, AUTH_RATE_LIMIT, AUTH_RATE_WINDOW_SECONDS
+            redis, key, rate_limit, window_seconds
         )
     except Exception:
         logger.warning("Auth rate limit check failed — allowing request", exc_info=True)
