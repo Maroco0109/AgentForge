@@ -178,7 +178,7 @@ export default function SettingsPage() {
           <div className="space-y-3">
             {PROVIDERS.map((provider) => (
               <ProviderCard
-                key={provider}
+                key={getKeyForProvider(provider)?.id ?? provider}
                 provider={provider}
                 keyData={getKeyForProvider(provider)}
                 onRegister={openRegisterDialog}

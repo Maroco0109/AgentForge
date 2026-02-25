@@ -251,7 +251,7 @@ export default function ProviderCard({
           <>
             <button
               onClick={handleValidate}
-              disabled={isValidating}
+              disabled={isValidating || isDeleting}
               className="px-3 py-1.5 text-xs text-gray-400 hover:text-gray-200 hover:bg-gray-800 border border-gray-700 hover:border-gray-600 rounded-md transition-colors disabled:opacity-50"
             >
               {isValidating ? "Validating..." : "Re-validate"}
