@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import { saveTokens, clearTokens } from "./auth";
 
 interface User {
   email: string;
@@ -67,7 +68,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const data = await response.json();
     const accessToken = data.access_token;
 
-    localStorage.setItem(TOKEN_KEY, accessToken);
+    saveTokens(data);
     setToken(accessToken);
 
     // Decode user info from JWT
@@ -101,7 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [router]);
 
   const logout = useCallback(() => {
-    localStorage.removeItem(TOKEN_KEY);
+    clearTokens();
     setToken(null);
     setUser(null);
     router.push("/login");
