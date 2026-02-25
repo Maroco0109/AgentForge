@@ -57,8 +57,9 @@ def _make_design_dict() -> dict:
 class TestExecuteDirect:
     """Tests for POST /api/v1/pipelines/execute-direct."""
 
+    @patch("backend.gateway.routes.pipeline.get_user_router", new_callable=AsyncMock)
     @patch("backend.gateway.routes.pipeline.PipelineOrchestrator")
-    def test_execute_direct_success(self, mock_orch_class, client):
+    def test_execute_direct_success(self, mock_orch_class, mock_get_router, client):
         mock_result = PipelineResult(
             design_name="Test Pipeline",
             status="completed",
@@ -71,6 +72,7 @@ class TestExecuteDirect:
         mock_orch = AsyncMock()
         mock_orch.execute = AsyncMock(return_value=mock_result)
         mock_orch_class.return_value = mock_orch
+        mock_get_router.return_value = AsyncMock()
 
         response = client.post(
             "/api/v1/pipelines/execute-direct",
@@ -96,8 +98,11 @@ class TestExecuteDirect:
         )
         assert response.status_code == 422
 
+    @patch("backend.gateway.routes.pipeline.get_user_router", new_callable=AsyncMock)
     @patch("backend.gateway.routes.pipeline.PipelineOrchestrator")
-    def test_execute_direct_shares_logic_with_execute(self, mock_orch_class, client):
+    def test_execute_direct_shares_logic_with_execute(
+        self, mock_orch_class, mock_get_router, client
+    ):
         """Both endpoints should produce similar responses for the same input."""
         mock_result = PipelineResult(
             design_name="Test Pipeline",
@@ -111,6 +116,7 @@ class TestExecuteDirect:
         mock_orch = AsyncMock()
         mock_orch.execute = AsyncMock(return_value=mock_result)
         mock_orch_class.return_value = mock_orch
+        mock_get_router.return_value = AsyncMock()
 
         design = _make_design_dict()
 

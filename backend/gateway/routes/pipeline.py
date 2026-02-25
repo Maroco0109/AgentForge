@@ -21,6 +21,8 @@ from backend.gateway.cost_tracker import (
 )
 from backend.pipeline.orchestrator import PipelineOrchestrator
 from backend.pipeline.result import PipelineResult
+from backend.pipeline.user_router_factory import get_user_router
+from backend.shared.database import AsyncSessionLocal
 from backend.shared.models import User
 
 logger = logging.getLogger(__name__)
@@ -89,7 +91,27 @@ async def _execute_pipeline_core(
             detail="A pipeline is already running. Please wait for it to complete.",
         )
 
-    orchestrator = PipelineOrchestrator()
+    # Get user-specific LLM router (BYOK)
+    try:
+        async with AsyncSessionLocal() as session:
+            user_router = await get_user_router(user_id_str, session)
+    except ValueError:
+        del _pipeline_runs[pipeline_id]
+        await release_pipeline_lock(user_id_str)
+        raise HTTPException(
+            status_code=400,
+            detail="LLM API key is not configured. Please register a key in settings.",
+        )
+    except Exception:
+        logger.exception("Failed to get user LLM router")
+        del _pipeline_runs[pipeline_id]
+        await release_pipeline_lock(user_id_str)
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to initialize LLM router. Please try again.",
+        )
+
+    orchestrator = PipelineOrchestrator(router=user_router)
 
     try:
         result = await orchestrator.execute(design=design)

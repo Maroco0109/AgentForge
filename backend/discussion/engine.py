@@ -39,12 +39,13 @@ class DiscussionEngine:
     state management, and discussion memory.
     """
 
-    def __init__(self, max_rounds: int = 5):
+    def __init__(self, max_rounds: int = 5, router=None):
         self.intent_analyzer = IntentAnalyzer()
         self.design_generator = DesignGenerator()
         self.critique_agent = CritiqueAgent()
         self.state_machine = DiscussionStateMachine(max_rounds=max_rounds)
         self.memory = DiscussionMemory()
+        self.router = router
 
         # Current session state
         self._current_intent: IntentResult | None = None

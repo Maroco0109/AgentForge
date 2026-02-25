@@ -12,8 +12,10 @@ from sqlalchemy import (
     Float,
     ForeignKey,
     Integer,
+    LargeBinary,
     String,
     Text,
+    UniqueConstraint,
     Uuid,
     func,
 )
@@ -58,6 +60,14 @@ class PipelineExecutionStatus(str, enum.Enum):
     FAILED = "failed"
 
 
+class LLMProviderType(str, enum.Enum):
+    """Supported LLM provider types for BYOK."""
+
+    OPENAI = "openai"
+    ANTHROPIC = "anthropic"
+    GOOGLE = "google"
+
+
 class User(Base):
     """User model."""
 
@@ -83,6 +93,9 @@ class User(Base):
         back_populates="user", cascade="all, delete-orphan"
     )
     templates: Mapped[list["PipelineTemplate"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+    llm_keys: Mapped[list["UserLLMKey"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
 
@@ -222,3 +235,34 @@ class PipelineExecution(Base):
     )
 
     user: Mapped["User"] = relationship()
+
+
+class UserLLMKey(Base):
+    """User's LLM provider API key (encrypted at rest)."""
+
+    __tablename__ = "user_llm_keys"
+    __table_args__ = (
+        UniqueConstraint("user_id", "provider", name="uq_user_llm_keys_user_provider"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    provider: Mapped[LLMProviderType] = mapped_column(Enum(LLMProviderType), nullable=False)
+    encrypted_key: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    key_prefix: Mapped[str] = mapped_column(String(12), nullable=False)
+    nonce: Mapped[bytes] = mapped_column(LargeBinary(12), nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    is_valid: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_validated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+    # Relationships
+    user: Mapped["User"] = relationship(back_populates="llm_keys")
