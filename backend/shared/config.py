@@ -38,8 +38,6 @@ class Settings(BaseSettings):
                 self.SECRET_KEY = "dev-secret-key-change-in-production"
             else:
                 raise ValueError("SECRET_KEY must be set in production")
-        if not self.DEBUG and not self.ENCRYPTION_KEY:
-            raise ValueError("ENCRYPTION_KEY must be set in production")
         return self
 
     class Config:
