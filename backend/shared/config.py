@@ -27,6 +27,9 @@ class Settings(BaseSettings):
     # Data Collector settings
     DATA_COLLECTOR_URL: str = "http://localhost:8001"
 
+    # Encryption
+    ENCRYPTION_KEY: str = ""
+
     @model_validator(mode="after")
     def validate_secret_key(self):
         """Provide default SECRET_KEY in debug mode, require it in production."""
