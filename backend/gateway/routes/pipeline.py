@@ -102,6 +102,14 @@ async def _execute_pipeline_core(
             status_code=400,
             detail="LLM API key is not configured. Please register a key in settings.",
         )
+    except Exception:
+        logger.exception("Failed to get user LLM router")
+        del _pipeline_runs[pipeline_id]
+        await release_pipeline_lock(user_id_str)
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to initialize LLM router. Please try again.",
+        )
 
     orchestrator = PipelineOrchestrator(router=user_router)
 

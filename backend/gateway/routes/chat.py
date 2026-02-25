@@ -189,14 +189,25 @@ async def _process_discussion_response(
         try:
             async with AsyncSessionLocal() as session:
                 user_router = await get_user_router(user_id, session)
-        except Exception as e:
-            if not isinstance(e, ValueError):
-                logger.exception("Failed to get user LLM router")
+        except ValueError:
             await manager.send_personal_message(
                 json.dumps(
                     {
                         "type": "error",
                         "content": "LLM API 키가 등록되지 않았습니다. 설정에서 키를 등록해주세요.",
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                    }
+                ),
+                client_id,
+            )
+            return
+        except Exception:
+            logger.exception("Failed to get user LLM router")
+            await manager.send_personal_message(
+                json.dumps(
+                    {
+                        "type": "error",
+                        "content": "LLM 라우터 초기화에 실패했습니다. 잠시 후 다시 시도해주세요.",
                         "timestamp": datetime.now(timezone.utc).isoformat(),
                     }
                 ),
