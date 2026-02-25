@@ -51,3 +51,44 @@ export async function apiFetch<T>(
 
   return response.json();
 }
+
+// LLM Key Management
+export interface LLMKeyResponse {
+  id: string;
+  provider: string;
+  key_prefix: string;
+  is_active: boolean;
+  is_valid: boolean;
+  last_used_at: string | null;
+  last_validated_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LLMKeyValidationResponse {
+  provider: string;
+  is_valid: boolean;
+  message: string;
+  models_available: string[];
+}
+
+export async function listLLMKeys(): Promise<LLMKeyResponse[]> {
+  return apiFetch<LLMKeyResponse[]>("/api/v1/llm-keys");
+}
+
+export async function registerLLMKey(provider: string, apiKey: string): Promise<LLMKeyResponse> {
+  return apiFetch<LLMKeyResponse>("/api/v1/llm-keys", {
+    method: "POST",
+    body: JSON.stringify({ provider, api_key: apiKey }),
+  });
+}
+
+export async function deleteLLMKey(keyId: string): Promise<void> {
+  await apiFetch<void>(`/api/v1/llm-keys/${keyId}`, { method: "DELETE" });
+}
+
+export async function validateLLMKey(keyId: string): Promise<LLMKeyValidationResponse> {
+  return apiFetch<LLMKeyValidationResponse>(`/api/v1/llm-keys/${keyId}/validate`, {
+    method: "POST",
+  });
+}
