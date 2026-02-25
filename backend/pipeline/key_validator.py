@@ -67,7 +67,7 @@ async def validate_provider_key(
         return False, "Validation timed out", []
     except Exception as e:
         logger.warning(f"Key validation failed for {provider.value}: {e}")
-        return False, f"Validation failed: {e}", []
+        return False, "Key validation failed. Please check your API key.", []
 
 
 async def _validate_openai(api_key: str) -> tuple[bool, str, list[str]]:
@@ -117,19 +117,9 @@ async def _validate_google(api_key: str) -> tuple[bool, str, list[str]]:
     """
     client = google_genai.Client(api_key=api_key)
     try:
+        result = await asyncio.to_thread(lambda: list(client.models.list()))
         models = []
-        async for model in await asyncio.to_thread(client.models.list):
-            name = getattr(model, "name", "")
-            methods = getattr(model, "supported_generation_methods", []) or []
-            if "generateContent" in methods:
-                models.append(name)
-            if len(models) >= 20:
-                break
-        return True, "Google Gemini key is valid", models
-    except TypeError:
-        # client.models.list() may return a sync iterable
-        models = []
-        for model in await asyncio.to_thread(lambda: list(client.models.list())):
+        for model in result:
             name = getattr(model, "name", "")
             methods = getattr(model, "supported_generation_methods", []) or []
             if "generateContent" in methods:
