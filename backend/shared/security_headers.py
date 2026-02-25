@@ -25,6 +25,8 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             "style-src 'self' 'unsafe-inline'; "
             "img-src 'self' data: blob:; "
             "font-src 'self' data:; "
+            "object-src 'none'; "
+            "base-uri 'self'; "
             "frame-ancestors 'none'"
         )
         if debug:
