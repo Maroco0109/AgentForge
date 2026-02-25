@@ -17,18 +17,22 @@ class SessionManager:
         self.max_sessions = max_sessions
         self._sessions: OrderedDict[str, DiscussionEngine] = OrderedDict()
 
-    def get_or_create(self, conversation_id: str) -> DiscussionEngine:
+    def get_or_create(self, conversation_id: str, router=None) -> DiscussionEngine:
         """Get existing engine or create a new one for this conversation."""
         if conversation_id in self._sessions:
             # Move to end (most recently used)
             self._sessions.move_to_end(conversation_id)
-            return self._sessions[conversation_id]
+            engine = self._sessions[conversation_id]
+            # Update router if provided (BYOK key may change)
+            if router is not None:
+                engine.router = router
+            return engine
 
         # Evict oldest if at capacity
         while len(self._sessions) >= self.max_sessions:
             self._sessions.popitem(last=False)
 
-        engine = DiscussionEngine()
+        engine = DiscussionEngine(router=router)
         self._sessions[conversation_id] = engine
         return engine
 
