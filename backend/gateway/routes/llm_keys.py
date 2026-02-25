@@ -55,7 +55,7 @@ async def register_llm_key(
     encrypted_key, nonce = encrypt_api_key(request.api_key)
 
     # Key prefix for display (first 12 chars)
-    key_prefix = request.api_key[:12] + "..."
+    key_prefix = request.api_key[:12]
 
     now = datetime.now(timezone.utc)
 
