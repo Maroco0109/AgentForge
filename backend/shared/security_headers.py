@@ -32,7 +32,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         if debug:
             connect = "connect-src 'self' ws: wss: http://localhost:* ws://localhost:*"
         else:
-            connect = "connect-src 'self' ws: wss:"
+            connect = "connect-src 'self' wss:"
         self.csp = f"{base}; {connect}"
 
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
