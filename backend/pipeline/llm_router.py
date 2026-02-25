@@ -260,7 +260,8 @@ class GeminiClient(BaseLLMClient):
         # Safe text extraction (handles safety filter blocks)
         try:
             content = response.text or ""
-        except ValueError:
+        except ValueError as e:
+            logger.warning("Gemini response blocked by safety filter: %s", e)
             content = ""
 
         return LLMResponse(
