@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     ANTHROPIC_API_KEY: str = ""
     DEFAULT_LLM_PROVIDER: str = "openai"
     DEFAULT_LLM_MODEL: str = "gpt-4o-mini"
+    GOOGLE_API_KEY: str = ""
 
     # Data Collector settings
     DATA_COLLECTOR_URL: str = "http://localhost:8001"
