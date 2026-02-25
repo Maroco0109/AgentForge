@@ -60,4 +60,4 @@ def downgrade() -> None:
     """Drop user_llm_keys table."""
     op.drop_index("ix_user_llm_keys_user_id", table_name="user_llm_keys")
     op.drop_table("user_llm_keys")
-    sa.Enum(name="llmprovidertype").drop(op.get_bind())
+    sa.Enum(name="llmprovidertype").drop(op.get_bind(), checkfirst=True)
