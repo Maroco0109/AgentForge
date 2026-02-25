@@ -237,6 +237,42 @@ class TemplateListResponse(BaseModel):
         from_attributes = True
 
 
+# LLM Key schemas (BYOK)
+class LLMKeyCreate(BaseModel):
+    """Schema for registering an LLM API key."""
+
+    provider: str = Field(description="LLM provider: openai, anthropic, google")
+    api_key: str = Field(min_length=10, max_length=500, description="API key")
+
+
+class LLMKeyResponse(BaseModel):
+    """Schema for LLM key response (masked, no actual key)."""
+
+    id: uuid.UUID
+    provider: str
+    key_prefix: str
+    is_active: bool
+    is_valid: bool
+    last_used_at: datetime | None
+    last_validated_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        """Pydantic config."""
+
+        from_attributes = True
+
+
+class LLMKeyValidationResponse(BaseModel):
+    """Schema for LLM key validation result."""
+
+    provider: str
+    is_valid: bool
+    message: str
+    models_available: list[str] = []
+
+
 # Health check schema
 class HealthResponse(BaseModel):
     """Schema for health check response."""

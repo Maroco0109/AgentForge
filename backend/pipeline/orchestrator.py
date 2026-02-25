@@ -27,8 +27,9 @@ DEFAULT_TIMEOUT = 300  # 5 minutes
 class PipelineOrchestrator:
     """Executes pipelines built from DesignProposals using LangGraph."""
 
-    def __init__(self):
+    def __init__(self, router=None):
         self.builder = PipelineGraphBuilder()
+        self.router = router
 
     async def execute(
         self,
@@ -52,7 +53,7 @@ class PipelineOrchestrator:
 
         # Build the LangGraph
         try:
-            compiled_graph = self.builder.build(design)
+            compiled_graph = self.builder.build(design, router=self.router)
         except ValueError as e:
             PIPELINE_EXECUTIONS_TOTAL.labels(status="failed").inc()
             return PipelineResult(

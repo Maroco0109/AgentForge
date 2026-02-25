@@ -113,11 +113,14 @@ def make_condition_fn(condition_str: str):
 class PipelineGraphBuilder:
     """Converts a DesignProposal into a compiled LangGraph StateGraph."""
 
-    def build(self, design: DesignProposal | ExtendedDesignProposal) -> CompiledStateGraph:
+    def build(
+        self, design: DesignProposal | ExtendedDesignProposal, router=None
+    ) -> CompiledStateGraph:
         """Build a LangGraph from a DesignProposal.
 
         Supports both sequential (legacy) and explicit edge topology (Phase 8B).
         """
+        self._current_router = router
         agents = design.agents
         if not agents:
             raise ValueError("DesignProposal has no agents defined")
@@ -129,7 +132,7 @@ class PipelineGraphBuilder:
         name_counts: dict[str, int] = {}
 
         for agent_spec in agents:
-            node = self._create_node(agent_spec)
+            node = self._create_node(agent_spec, router=self._current_router)
             node_name = agent_spec.name
             # Ensure unique node names with counter
             if node_name in name_counts:
@@ -294,7 +297,7 @@ class PipelineGraphBuilder:
 
         graph.add_conditional_edges(source, _conditional_route)
 
-    def _create_node(self, agent_spec: AgentSpec | ExtendedAgentSpec) -> object:
+    def _create_node(self, agent_spec: AgentSpec | ExtendedAgentSpec, router=None) -> object:
         """Create an agent node from an AgentSpec or ExtendedAgentSpec."""
         from backend.pipeline.extended_models import ExtendedAgentSpec
 
@@ -311,6 +314,7 @@ class PipelineGraphBuilder:
                 temperature=agent_spec.temperature,
                 max_tokens=agent_spec.max_tokens,
                 retry_count=agent_spec.retry_count,
+                router=router,
                 **(
                     {"custom_prompt": agent_spec.custom_prompt} if agent_spec.is_custom_role else {}
                 ),
@@ -323,4 +327,5 @@ class PipelineGraphBuilder:
             role=agent_spec.role,
             description=agent_spec.description,
             llm_model=agent_spec.llm_model,
+            router=router,
         )
