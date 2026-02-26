@@ -36,6 +36,7 @@ spec:
               echo "requirepass $REDIS_PASSWORD" > /tmp/redis.conf
               echo "maxmemory 256mb" >> /tmp/redis.conf
               echo "maxmemory-policy allkeys-lru" >> /tmp/redis.conf
+              chmod 600 /tmp/redis.conf
               redis-server /tmp/redis.conf
           resources:
             requests:
