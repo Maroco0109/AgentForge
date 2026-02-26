@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: agentforge-config
+  namespace: agentforge
+  labels:
+    app.kubernetes.io/part-of: agentforge
+data:
+  POSTGRES_DB: "agentforge"
+  DATA_COLLECTOR_URL: "http://data-collector.agentforge.svc.cluster.local:8001"
+  CORS_ORIGINS: '["https://your-domain.com"]'
+  DEBUG: "false"
+  DAILY_COST_LIMIT: "10.0"
+  AUTH_RATE_LIMIT: "5"
+  DB_POOL_SIZE: "5"
+  DB_MAX_OVERFLOW: "10"
