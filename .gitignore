@@ -90,3 +90,7 @@ logs/
 
 # OMC State
 .omc/
+
+# K8s secrets (never commit actual secrets)
+k8s/secrets.yaml
+k8s/monitoring/monitoring-secret.yaml

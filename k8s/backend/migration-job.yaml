@@ -1,0 +1,30 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: alembic-migration
+  namespace: agentforge
+  labels:
+    app: backend
+    app.kubernetes.io/part-of: agentforge
+    app.kubernetes.io/component: migration
+spec:
+  backoffLimit: 3
+  activeDeadlineSeconds: 300
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        app: backend
+        component: migration
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: migration
+          image: agentforge-backend:latest
+          command: ["sh", "-c", "cd /app/backend && alembic upgrade head"]
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: agentforge-secrets
+                  key: DATABASE_URL

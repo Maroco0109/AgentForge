@@ -34,6 +34,10 @@ class Settings(BaseSettings):
     # Encryption
     ENCRYPTION_KEY: str = ""
 
+    # Database pool settings (K8s optimized)
+    DB_POOL_SIZE: int = 5
+    DB_MAX_OVERFLOW: int = 10
+
     @model_validator(mode="after")
     def validate_secret_key(self):
         """Provide default SECRET_KEY in debug mode, require it in production."""

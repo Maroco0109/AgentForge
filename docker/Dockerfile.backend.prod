@@ -38,10 +38,11 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')" || exit 1
 
 CMD ["gunicorn", "gateway.main:app", \
-     "-w", "4", \
+     "-w", "1", \
      "-k", "uvicorn.workers.UvicornWorker", \
      "--bind", "0.0.0.0:8000", \
      "--timeout", "120", \
      "--graceful-timeout", "30", \
      "--max-requests", "1000", \
-     "--max-requests-jitter", "50"]
+     "--max-requests-jitter", "50", \
+     "--ws-max-size", "1048576"]

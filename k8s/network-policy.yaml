@@ -1,0 +1,86 @@
+# NetworkPolicy: Restrict access to PostgreSQL
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgres-access
+  namespace: agentforge
+  labels:
+    app.kubernetes.io/part-of: agentforge
+spec:
+  podSelector:
+    matchLabels:
+      app: postgres
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: backend
+        - podSelector:
+            matchLabels:
+              app: data-collector
+        - podSelector:
+            matchLabels:
+              component: migration
+      ports:
+        - protocol: TCP
+          port: 5432
+---
+# NetworkPolicy: Restrict access to Redis
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: redis-access
+  namespace: agentforge
+  labels:
+    app.kubernetes.io/part-of: agentforge
+spec:
+  podSelector:
+    matchLabels:
+      app: redis
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: backend
+        - podSelector:
+            matchLabels:
+              app: data-collector
+      ports:
+        - protocol: TCP
+          port: 6379
+---
+# NetworkPolicy: Allow Ingress traffic only to frontend and backend
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ingress-access
+  namespace: agentforge
+  labels:
+    app.kubernetes.io/part-of: agentforge
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app
+        operator: In
+        values:
+          - frontend
+          - backend
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        # Allow traffic from ingress-nginx namespace
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+        # Allow traffic from within agentforge namespace (inter-service)
+        - podSelector: {}
+      ports:
+        - protocol: TCP
+          port: 3000
+        - protocol: TCP
+          port: 8000
