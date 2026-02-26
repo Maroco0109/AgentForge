@@ -1,0 +1,13 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: frontend-pdb
+  namespace: agentforge
+  labels:
+    app: frontend
+    app.kubernetes.io/part-of: agentforge
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: frontend

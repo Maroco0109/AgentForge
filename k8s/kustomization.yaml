@@ -1,0 +1,47 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: agentforge
+
+resources:
+  # 1. Namespace
+  - namespace.yaml
+
+  # 2. Configuration
+  - configmap.yaml
+
+  # 3. Stateful services (PostgreSQL + Redis)
+  - postgres/statefulset.yaml
+  - postgres/service.yaml
+  - redis/statefulset.yaml
+  - redis/service.yaml
+
+  # 4. Database migration (run after PostgreSQL is ready)
+  - backend/migration-job.yaml
+
+  # 5. Stateless services
+  - backend/deployment.yaml
+  - backend/service.yaml
+  - backend/hpa.yaml
+  - backend/pdb.yaml
+  - frontend/deployment.yaml
+  - frontend/service.yaml
+  - frontend/pdb.yaml
+  - data-collector/deployment.yaml
+  - data-collector/service.yaml
+
+  # 6. Networking
+  - ingress.yaml
+  - network-policy.yaml
+
+  # 7. Monitoring
+  - monitoring/prometheus-configmap.yaml
+  - monitoring/prometheus-deployment.yaml
+  - monitoring/prometheus-service.yaml
+  - monitoring/grafana-deployment.yaml
+  - monitoring/grafana-service.yaml
+
+# Note: Secrets are NOT included in kustomization.yaml.
+# They must be applied manually:
+#   kubectl apply -f k8s/secrets.yaml
+#   kubectl apply -f k8s/monitoring/monitoring-secret.yaml
