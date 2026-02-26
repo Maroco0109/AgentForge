@@ -32,7 +32,11 @@ spec:
           command:
             - sh
             - -c
-            - redis-server --requirepass $(REDIS_PASSWORD) --maxmemory 256mb --maxmemory-policy allkeys-lru
+            - |
+              echo "requirepass $REDIS_PASSWORD" > /tmp/redis.conf
+              echo "maxmemory 256mb" >> /tmp/redis.conf
+              echo "maxmemory-policy allkeys-lru" >> /tmp/redis.conf
+              redis-server /tmp/redis.conf
           resources:
             requests:
               memory: "64Mi"
@@ -45,7 +49,7 @@ spec:
               command:
                 - sh
                 - -c
-                - redis-cli -a $REDIS_PASSWORD ping | grep -q PONG
+                - REDISCLI_AUTH=$REDIS_PASSWORD redis-cli ping | grep -q PONG
             initialDelaySeconds: 30
             periodSeconds: 30
             timeoutSeconds: 5
@@ -54,7 +58,7 @@ spec:
               command:
                 - sh
                 - -c
-                - redis-cli -a $REDIS_PASSWORD ping | grep -q PONG
+                - REDISCLI_AUTH=$REDIS_PASSWORD redis-cli ping | grep -q PONG
             initialDelaySeconds: 5
             periodSeconds: 10
             timeoutSeconds: 5
