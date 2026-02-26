@@ -72,7 +72,13 @@ spec:
   policyTypes:
     - Ingress
   ingress:
-    - from: []
+    - from:
+        # Allow traffic from ingress-nginx namespace
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+        # Allow traffic from within agentforge namespace (inter-service)
+        - podSelector: {}
       ports:
         - protocol: TCP
           port: 3000
